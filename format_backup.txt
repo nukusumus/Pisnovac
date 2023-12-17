@@ -1,0 +1,31 @@
+% PREFIX_LATEX
+\documentclass[a5paper]{article}
+
+\pdfpageheight=210mm
+\pdfpagewidth=148mm
+
+\usepackage[chordbk]{songbook}
+
+\oddsidemargin=21mm
+\evensidemargin=21mm
+
+\setlength{\parindent}{0pt}
+
+\usepackage[T1]{fontenc}
+\usepackage{tgbonum}
+
+\begin{document}
+@%PREFIX_TO_SONG_NAME
+\begin{center}
+    \section{@}%SONG_NAME_TO_NOTE
+    \subsection*{@}%SONG_NOTE_TO_TEXT
+\end{center}
+
+\bigskip
+@%TABLE_CONTENTS
+\renewcommand*\contentsname{Obsah}
+\tableofcontents
+@%END_LATEX
+\newpage
+@%LATEX_SONG_SPLITTER
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
