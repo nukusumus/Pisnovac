@@ -43,13 +43,13 @@ VERSION_FILE_NAME = "version.txt"
 
 DISPLAYED_SONG_PART_LENGTH = 50
 
-HOME_DIR = os.path.expanduser("~\\Documents\\Pisnovac") + os.sep
-SOURCE_DIR = HOME_DIR + "Src\\"
+HOME_DIR = os.path.expanduser(f"~{os.sep}Documents{os.sep}Pisnovac{os.sep}")
+SOURCE_DIR = HOME_DIR + f"Src{os.sep}"
 ERR_LOG_PATH = SOURCE_DIR + "errors.log"
-RECORDINGS_CACHE_DIR = HOME_DIR + "Recordings\\"
-LOCAL_SONG_LOCATION = HOME_DIR + "Songs\\Local\\"
-ONLINE_SONG_LOCATION = HOME_DIR + "Songs\\Online\\"
-LOCAL_TEMP_PATH = HOME_DIR + "Temp\\"
+RECORDINGS_CACHE_DIR = HOME_DIR + f"Recordings{os.sep}"
+LOCAL_SONG_LOCATION = HOME_DIR + f"Songs{os.sep}Local{os.sep}"
+ONLINE_SONG_LOCATION = HOME_DIR + f"Songs{os.sep}Online{os.sep}"
+LOCAL_TEMP_PATH = HOME_DIR + f"Temp{os.sep}"
 
 # kontrola instalace
 if not os.path.isdir(SOURCE_DIR) or not os.path.isfile(SOURCE_DIR + SETTINGS_FILE_NAME):
@@ -61,7 +61,7 @@ with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r") as file:
     lines = file.readlines()
     if lines[8].rstrip() != VERSION:
         with open(SOURCE_DIR + SETTINGS_FILE_NAME, "w") as file_write:
-            file_write.write(f"eva.fit.vutbr.cz\nxsterb16\n{lines[2].rstrip()}\n/homes/eva/xs/xsterb16/Songbook_editor/\ntahomabd.ttf,76\nwhite\nblack,5\nblack,5\n0.4")
+            file_write.write(f"eva.fit.vutbr.cz\nxsterb16\n{lines[2].rstrip()}\n/homes/eva/xs/xsterb16/Songbook_editor/\ntahomabd.ttf,76\nwhite\nblack,5\nblack,5\n{VERSION}")
 
 # nahrani veci z nastaveni
 with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r") as file:
@@ -88,6 +88,9 @@ SERVER_ERROR_LOGS_PATH = SERVER_BASE_LOCATION + "Error_logs/"  # posilani statis
 SERVER_IMAGE_LOCATION = SERVER_BASE_LOCATION + "Images/"  # docasne uloziste obrazku ke stahnuti
 SERVER_SOURCE_LOCATION = SERVER_BASE_LOCATION + "Source/"  # ulozeni defaultniho nastaveni, tex sablony
 
+current_file_history = None
+history_index = 0
+save_enable = True
 server_song_folder_list = [] # bude se v nem ukladat obsah adresare na serveru s pisnemi a nahravkami
 editing_file_path = ""  # aktualne upravovany soubor
 actual_song_directory = ""  # cesta k pisnim v offline/online rezimu
@@ -398,15 +401,6 @@ def load_colors():
 
     STG_COLOR_DICT = dict([(cz,en) for cz,en in zip(colors_list_cz, colors_list_en)])
 
-def check_updates():
-    """porovna obsah version file s verzi tohoto kodu"""
-    if not os.path.isfile(SOURCE_DIR + VERSION_FILE_NAME):
-        return
-    with open(SOURCE_DIR + VERSION_FILE_NAME, "r") as file:
-        new_version = file.read()
-    if new_version.rstrip() != VERSION:
-        pop_info(f"Verze {new_version} je k dispozici!")
-
 def load_latex_template():
     """nahrani latexove sablony ze souboru do konstant"""
     global PREFIX_LATEX, PREFIX_TO_SONG_NAME, SONG_NAME_TO_NOTE, SONG_AUTHOR_TO_TEXT, TABLE_CONTENTS, END_LATEX, LATEX_SONG_SPLITTER
@@ -521,7 +515,7 @@ def update_status(message):
 def pop_error(msg):
     messagebox.showerror("Chyba", msg)
 
-def pop_info(msg):
+def pop_info(msg: str):
     messagebox.showinfo("Info", msg)
 
 def update_output_view():
@@ -601,6 +595,119 @@ def load_image(path, mode=None):
     label.update()
 
     update_tree_selection()
+
+def rm_nl(s:str)->str:
+    """odstrani jeden znak noveho radku z konce retezce"""
+    if(len(s) == 0):
+        return s
+    if s[-1] == '\n':
+        return s[0:-1]
+    return s
+
+def start_autosave():
+    call_save_history()
+    main_window.after(1000, start_autosave)
+
+def call_save_history():
+    process = threading.Thread(target=save_to_history)
+    process.start()
+
+def save_to_history():
+    """ulozi obsah edit boxu do historie, pripadne pokud editing_file_path == "", tak vymaze historii"""
+    global current_file_history, editing_file_path, save_enable, history_index
+
+    if save_enable == False:
+        return
+
+    if editing_file_path == "":
+        current_file_history = None
+        history_index = -1
+        return
+
+    text_tuple = (song_name_box.get(),song_author_box.get(), song_note_box.get(), slide_order_box.get(), rm_nl(edit_mode_main_text_box.get("1.0", END)), edit_mode_main_text_box.index(INSERT))
+    new_text = text_tuple[0] + text_tuple[1] + text_tuple[2] + text_tuple[3] + text_tuple[4]
+    if current_file_history == None:
+        history_index = 0
+        current_file_history = [text_tuple]
+    else:
+        old_text = current_file_history[history_index][0] + current_file_history[history_index][1] + current_file_history[history_index][2] + current_file_history[history_index][3] + current_file_history[history_index][4]
+        if old_text != new_text:
+            history_index += 1
+            current_file_history = current_file_history[0:history_index] # po uprave textu neni mozne opakovat vracene zmeny, zbytek seznamu se zahodi
+            current_file_history.append(text_tuple)
+    
+    # aktualizace aktualni polohy kurzoru
+    current_file_history[history_index] = (text_tuple[0], text_tuple[1], text_tuple[2], text_tuple[3], text_tuple[4], edit_mode_main_text_box.index(INSERT))
+
+def history_undo():
+    global current_file_history, save_enable, history_index
+    save_enable = False
+    if current_file_history == None:
+        save_enable = True
+        return
+    
+    if history_index <= 0:
+        pop_info("Nelze vrátit zpět")
+        save_enable = True
+        return
+    
+    history_index -= 1
+
+    new_text = current_file_history[history_index]
+
+    song_author_box.delete("0", END)
+    song_author_box.insert(INSERT, new_text[1])
+    song_name_box.delete("0", END)
+    song_name_box.insert(INSERT, new_text[0])
+    song_note_box.delete("0", END)
+    song_note_box.insert(INSERT, new_text[2])
+    slide_order_box.delete("0", END)
+    slide_order_box.insert(INSERT, new_text[3])
+    edit_mode_main_text_box.delete("1.0", END)
+    edit_mode_main_text_box.insert(INSERT, new_text[4].rstrip())
+    edit_mode_main_text_box.mark_set(INSERT, new_text[5])
+
+    # kvuli nejakemu automatickemu pridani newlinu obnovim obsah aktualni bunky
+    text_tuple = (song_name_box.get(),song_author_box.get(), song_note_box.get(), slide_order_box.get(), rm_nl(edit_mode_main_text_box.get("1.0", END)), new_text[5])
+    current_file_history[history_index] = text_tuple
+
+    save_enable = True
+
+def history_redo():
+    global current_file_history, save_enable, history_index
+    save_enable = False
+    if current_file_history == None:
+        save_enable = True
+        return
+    
+    if history_index + 2 > len(current_file_history):
+        pop_info("Nelze znovu provést")
+        save_enable = True
+        return
+        
+    edit_box_position = edit_mode_main_text_box.index(INSERT)
+
+    history_index += 1
+
+    new_text = current_file_history[history_index]
+
+    song_author_box.delete("0", END)
+    song_author_box.insert(INSERT, new_text[1])
+    song_name_box.delete("0", END)
+    song_name_box.insert(INSERT, new_text[0])
+    song_note_box.delete("0", END)
+    song_note_box.insert(INSERT, new_text[2])
+    slide_order_box.delete("0", END)
+    slide_order_box.insert(INSERT, new_text[3])
+    edit_mode_main_text_box.delete("1.0", END)
+    edit_mode_main_text_box.insert(INSERT, new_text[4])
+    edit_mode_main_text_box.mark_set(INSERT, new_text[5])
+
+    # kvuli nejakemu automatickemu pridani newlinu obnovim obsah aktualni bunky
+    text_tuple = (song_name_box.get(),song_author_box.get(), song_note_box.get(), slide_order_box.get(), rm_nl(edit_mode_main_text_box.get("1.0", END)), new_text[5])
+    current_file_history[history_index] = text_tuple
+
+    save_enable = True
 
 def save_file(event=None):
     """ulozeni obsahu edit boxu do aktualne upravovaneho souboru, NEUKLADA data na server"""
@@ -782,6 +889,7 @@ def close_song(update = True) -> int:
     # nekdy je zbytecne obnovovat obrazovku
     if update:
         update_screen()
+    call_save_history()
     return 0
 
 def copy_song():
@@ -1050,6 +1158,7 @@ def update_screen():
     update_tags_menu()
     search_in_files()
     update_tree_selection()
+    call_save_history()
 
 def edt_update_recording_widgets():
     """zjisti info o nahravkach, obnovi obsah recording widgetu"""
@@ -2570,9 +2679,9 @@ date_time = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 # stahne do Online slozky pisne ze serveru a nejake source soubory
 if have_internet():
     server_comunication(
-        ["server_to_Online", "download_single_file", "download_single_file", "download_single_file", "download_single_file"],
-        ["", SOURCE_DIR + LATEX_FORMAT_FILE_NAME, SOURCE_DIR + COLOR_FILE_NAME, SOURCE_DIR + HELP_TEXT_FILE_NAME, SOURCE_DIR + VERSION_FILE_NAME],
-        ["", SERVER_SOURCE_LOCATION + LATEX_FORMAT_FILE_NAME, SERVER_SOURCE_LOCATION + COLOR_FILE_NAME, SERVER_SOURCE_LOCATION + HELP_TEXT_FILE_NAME, SERVER_SOURCE_LOCATION + VERSION_FILE_NAME],
+        ["server_to_Online", "download_single_file", "download_single_file", "download_single_file"],
+        ["", SOURCE_DIR + LATEX_FORMAT_FILE_NAME, SOURCE_DIR + COLOR_FILE_NAME, SOURCE_DIR + HELP_TEXT_FILE_NAME],
+        ["", SERVER_SOURCE_LOCATION + LATEX_FORMAT_FILE_NAME, SERVER_SOURCE_LOCATION + COLOR_FILE_NAME, SERVER_SOURCE_LOCATION + HELP_TEXT_FILE_NAME],
     )
 
     update_status("Načítání uživatelského rozhraní ...")
@@ -2714,6 +2823,9 @@ keybind_list = [
     ["<Control-e>", lambda event: add_symbols("[]", True), None, True],
     ["<Control-n>", lambda event: new_song(), None, False],
     ["<Control-r>", lambda event: update_output_view(), None, True],
+    ["<Control-z>", lambda event: history_undo(), None, True],
+    ["<Control-y>", lambda event: history_redo(), None, True],
+
 ]  # format seznamu: [[sequence, func, bind_id, unbind with others], ...]
 sls_bind_list = [
     ["<Escape>", sls_end_slideshow, None],
@@ -2744,6 +2856,7 @@ load_latex_template()
 
 update_internet_status()
 main_window.after(10000, call_update_internet_status)
+main_window.after(1000, start_autosave)
 
 # nacitani je hotove, tudiz se zapne GUI
 main_window.config(menu=menu)
@@ -2751,6 +2864,7 @@ main_window.config(menu=menu)
 set_mode_handeler("edit")
 update_status("Připraven")
 # kontrola aktualnosti
-check_updates()
+with open(SOURCE_DIR + os.path.sep + VERSION_FILE_NAME, "w") as file:
+    file.write(str(VERSION))
 
 main_window.mainloop()
