@@ -39,7 +39,6 @@ BG_SLIDESHOW_IMAGE_NAME = "background.jpg"
 DEFAULT_SLIDESHOW_IMAGE_NAME = "background_default.jpg"
 HELP_TEXT_FILE_NAME = "help_text.txt"
 COLOR_FILE_NAME = "colors.txt"
-VERSION_FILE_NAME = "version.txt"
 
 DISPLAYED_SONG_PART_LENGTH = 50
 
@@ -55,12 +54,6 @@ LOCAL_TEMP_PATH = HOME_DIR + f"Temp{os.sep}"
 if not os.path.isdir(SOURCE_DIR) or not os.path.isfile(SOURCE_DIR + SETTINGS_FILE_NAME):
     easygui.msgbox("Nebyly nalezeny potřebné soubory:\n" + os.path.join(SOURCE_DIR, SETTINGS_FILE_NAME), "Chyba instalace")
     sys.exit(1)
-
-# kontrola a aktualizace nastaveni
-with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r") as file:
-    lines = file.readlines()
-    with open(SOURCE_DIR + SETTINGS_FILE_NAME, "w") as file_write:
-        file_write.write(f"eva.fit.vutbr.cz\nxsterb16\n\n/homes/eva/xs/xsterb16/Songbook_editor/\ntahomabd.ttf,76\nwhite\nblack,5\nblack,5\n{VERSION}")
 
 # nahrani veci z nastaveni
 with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r") as file:
@@ -2235,7 +2228,6 @@ def stg_update_font_style(event = None):
     lines_list[5] = f"{STG_COLOR_DICT[stg_font_color_box.get()]}\n"
     lines_list[6] = f"{STG_COLOR_DICT[stg_shadow_color_box.get()]},{stg_shadow_size_box.get()}\n"
     lines_list[7] = f"{STG_COLOR_DICT[stg_border_color_box.get()]},{stg_border_size_box.get()}\n"
-    lines_list[8] = VERSION
 
     with open(os.path.join(SOURCE_DIR,SETTINGS_FILE_NAME), "w") as file:
         file.writelines(lines_list)
@@ -2862,8 +2854,5 @@ main_window.config(menu=menu)
 
 set_mode_handeler("edit")
 update_status("Připraven")
-# kontrola aktualnosti
-with open(SOURCE_DIR + os.path.sep + VERSION_FILE_NAME, "w") as file:
-    file.write(str(VERSION))
 
 main_window.mainloop()
