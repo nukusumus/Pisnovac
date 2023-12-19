@@ -59,9 +59,8 @@ if not os.path.isdir(SOURCE_DIR) or not os.path.isfile(SOURCE_DIR + SETTINGS_FIL
 # kontrola a aktualizace nastaveni
 with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r") as file:
     lines = file.readlines()
-    if lines[8].rstrip() != VERSION:
-        with open(SOURCE_DIR + SETTINGS_FILE_NAME, "w") as file_write:
-            file_write.write(f"eva.fit.vutbr.cz\nxsterb16\n{lines[2].rstrip()}\n/homes/eva/xs/xsterb16/Songbook_editor/\ntahomabd.ttf,76\nwhite\nblack,5\nblack,5\n{VERSION}")
+    with open(SOURCE_DIR + SETTINGS_FILE_NAME, "w") as file_write:
+        file_write.write(f"eva.fit.vutbr.cz\nxsterb16\n\n/homes/eva/xs/xsterb16/Songbook_editor/\ntahomabd.ttf,76\nwhite\nblack,5\nblack,5\n{VERSION}")
 
 # nahrani veci z nastaveni
 with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r") as file:
@@ -2065,7 +2064,7 @@ def sls_start_slideshow(event=None):
     sls_presentation_window.protocol("WM_DELETE_WINDOW", sls_end_slideshow)
     sls_presentation_window.geometry("640x360")
     sls_presentation_window.title("Prezentace")
-    sls_presentation_window.iconbitmap(SOURCE_DIR + "icon_note.ico")
+    # sls_presentation_window.iconbitmap(SOURCE_DIR + "icon_note.ico") # TODO
 
     monitor_width_list = [monitor.width for monitor in get_monitors()]
     
@@ -2311,9 +2310,9 @@ if True:
     online = have_internet()
     main_window = Tk()
     main_window.title(APP_NAME)
-    main_window.iconbitmap(SOURCE_DIR + "icon_note.ico")
+    # main_window.iconbitmap(SOURCE_DIR + "icon_note.ico") # TODO
     main_window.minsize(800, 500)
-    main_window.state("zoomed")
+    # main_window.state("zoomed") # TODO
 
     # pri pokusu o zavreni okna se zavola funkce on_closing
     main_window.protocol("WM_DELETE_WINDOW", on_closing)
