@@ -21,7 +21,6 @@ Novinky:
  -
 Todo:
  - nahled pisne aby mel dlouhy text
- - ctrl-z podpora
 """
 
 VERSION = "0.5"
@@ -2057,7 +2056,10 @@ def sls_start_slideshow(event=None):
     sls_presentation_window.protocol("WM_DELETE_WINDOW", sls_end_slideshow)
     sls_presentation_window.geometry("640x360")
     sls_presentation_window.title("Prezentace")
-    # sls_presentation_window.iconbitmap(SOURCE_DIR + "icon_note.ico") # TODO
+    try:
+        sls_presentation_window.iconbitmap(SOURCE_DIR + "icon.ico")
+    except:
+        pass
 
     monitor_width_list = [monitor.width for monitor in get_monitors()]
     
@@ -2302,9 +2304,12 @@ if True:
     online = have_internet()
     main_window = Tk()
     main_window.title(APP_NAME)
-    # main_window.iconbitmap(SOURCE_DIR + "icon_note.ico") # TODO
     main_window.minsize(800, 500)
-    # main_window.state("zoomed") # TODO
+    try:
+        main_window.iconbitmap(SOURCE_DIR + "icon.ico")
+        main_window.state("zoomed")
+    except:
+        pass    
 
     # pri pokusu o zavreni okna se zavola funkce on_closing
     main_window.protocol("WM_DELETE_WINDOW", on_closing)
