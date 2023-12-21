@@ -1375,6 +1375,7 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
                 file.writelines(settings_lines)
     except Exception as e:
         pop_error("Chyba připojení k serveru: " + str(e))
+        sys.stderr.write(str(e))
         update_status("Připraven")
         try:
             client.close()
@@ -1418,7 +1419,8 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
                         
                     time.sleep(0.2)
             except Exception as e:
-                pop_error("Chyba nahrávání:\n\n" + str(e))
+                pop_error("Chyba:\n\n" + str(e))
+                sys.stderr.write(str(e))
                 update_status("Připraven")
                 return 1
         # odstrani pouze jednu pisen ze serveru
@@ -1427,7 +1429,8 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
                 update_status("Odstraňování ...")
                 sftp_client.remove(server_path)
             except Exception as e:
-                pop_error("Chyba odstraňování:\n\n" + str(e))
+                pop_error("Chyba:\n\n" + str(e))
+                sys.stderr.write(str(e))
                 update_status("Připraven")
                 return 1
         elif action == "download_single_file":
@@ -1441,7 +1444,8 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
                     ),
                 )
             except Exception as e:
-                pop_error("Chyba stahování:\n\n" + str(e))
+                pop_error("Chyba:\n\n" + str(e))
+                sys.stderr.write(str(e))
                 update_status("Připraven")
                 return 1
         # stahne vsechny pisne ze serveru do Online slozky
@@ -1504,6 +1508,7 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
                 pop_error(
                     "Převod do JPG se nezdařil:\n" + str(e) + "\n" + str(stdout.read())
                 )
+                sys.stderr.write(str(e))
                 update_status("Připraven")
                 return 1
             if "page0.jpg" not in sftp_client.listdir(SERVER_IMAGE_LOCATION):
@@ -1639,6 +1644,7 @@ def save_recording():
         shutil.copy(os.path.join(RECORDINGS_CACHE_DIR, recording_name) , new_abs_path)
     except Exception as e:
         pop_error("Uložení se nezdařilo.\n" + str(e))
+        sys.stderr.write(str(e))
         return
     pop_info("Soubor uložen.")
 
@@ -2843,7 +2849,7 @@ sls_bind_list_on_mode_change = [
     ["<Control-Up>", lambda event: sls_change_slide("prev"), None]]
 
 # nastaveni souboru s cestou ERR_LOG_PATH jako chyboveho vystupu
-sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8")
+#sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8")
 
 sys.stderr.write("-------------------------- "+ date_time+ " --------------------------\n")
 
