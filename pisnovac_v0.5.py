@@ -448,7 +448,7 @@ def on_closing():
                 local_path_list=[ERR_LOG_PATH],
                 server_path_list=[
                     SERVER_ERROR_LOGS_PATH
-                    + os.getlogin()
+                    + os.path.expanduser("~/").replace("/", "")
                     + "_"
                     + datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
                 ],
@@ -1414,9 +1414,8 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
                 if os.path.basename(local_path)[-4:] == ".sbf":
                     update_status("Vytváření zálohy ...")
                     sftp_client.put(local_path,SERVER_BACKUP_LOCATION + 
-                                    os.path.basename(server_path) + "_" + os.getlogin() + "_" +
+                                    os.path.basename(server_path) + "_" + os.path.expanduser("~/").replace("/", "") + "_" +
                                     datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S"))
-                        
                     time.sleep(0.2)
             except Exception as e:
                 pop_error("Chyba:\n\n" + str(e))
@@ -2849,7 +2848,7 @@ sls_bind_list_on_mode_change = [
     ["<Control-Up>", lambda event: sls_change_slide("prev"), None]]
 
 # nastaveni souboru s cestou ERR_LOG_PATH jako chyboveho vystupu
-#sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8")
+sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8")
 
 sys.stderr.write("-------------------------- "+ date_time+ " --------------------------\n")
 
