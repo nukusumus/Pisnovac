@@ -16,9 +16,6 @@ import threading
 from screeninfo import get_monitors
 
 """
-Novinky:
- - opravene zpracovani zavorek pri transpozici
- -
 Todo:
  - nahled pisne aby mel dlouhy text
 """
@@ -39,7 +36,7 @@ DEFAULT_SLIDESHOW_IMAGE_NAME = "background_default.jpg"
 HELP_TEXT_FILE_NAME = "help_text.txt"
 COLOR_FILE_NAME = "colors.txt"
 
-DISPLAYED_SONG_PART_LENGTH = 50
+DISPLAYED_SONG_PART_LENGTH = 28 # idk asi idealni delka
 
 HOME_DIR = os.path.expanduser(f"~{os.sep}Documents{os.sep}Pisnovac{os.sep}")
 SOURCE_DIR = HOME_DIR + f"Src{os.sep}"
@@ -48,6 +45,7 @@ RECORDINGS_CACHE_DIR = HOME_DIR + f"Recordings{os.sep}"
 LOCAL_SONG_LOCATION = HOME_DIR + f"Songs{os.sep}Local{os.sep}"
 ONLINE_SONG_LOCATION = HOME_DIR + f"Songs{os.sep}Online{os.sep}"
 LOCAL_TEMP_PATH = HOME_DIR + f"Temp{os.sep}"
+SONGLISTS_DIR = HOME_DIR + f"Songlists{os.sep}"
 
 # kontrola instalace
 if not os.path.isdir(SOURCE_DIR) or not os.path.isfile(SOURCE_DIR + SETTINGS_FILE_NAME):
@@ -78,8 +76,10 @@ SERVER_LATEX_LOCATION = SERVER_BASE_LOCATION + "Latex/"  # tady se posle .tex so
 SERVER_ERROR_LOGS_PATH = SERVER_BASE_LOCATION + "Error_logs/"  # posilani statistik
 SERVER_IMAGE_LOCATION = SERVER_BASE_LOCATION + "Images/"  # docasne uloziste obrazku ke stahnuti
 SERVER_SOURCE_LOCATION = SERVER_BASE_LOCATION + "Source/"  # ulozeni defaultniho nastaveni, tex sablony
+SERVER_SONGLIST_DIR = SERVER_BASE_LOCATION + "Seznamy/" # seznamy pisni
 
-current_file_history = None
+songlist_list : list = []
+current_file_history : list = None # do listu uklada hostorii textu pisne
 history_index = 0
 save_enable = True
 server_song_folder_list = [] # bude se v nem ukladat obsah adresare na serveru s pisnemi a nahravkami
@@ -1042,7 +1042,7 @@ def call_update_internet_status():
     """update_internet_status se vola jako podproces, protoze jinak blokuje plynulost UI"""
     process = threading.Thread(target=update_internet_status)
     process.start()
-    main_window.after(10000, call_update_internet_status)
+    main_window.after(5000, call_update_internet_status)
 
 def update_internet_status():
     """zkontroluje pripojeni, obnovi widgety souvisejici s pripojenim, pripadne presune online nactene soubory na lokalni uloziste"""
@@ -1397,6 +1397,16 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
 
         if action == "execute_command":
             client.exec_command(command)
+
+        # stahne seznamy pisni
+        elif action == "download_songlists":
+            for songlist in os.listdir(SONGLISTS_DIR):
+                os.remove(os.path.join(SONGLISTS_DIR, songlist))
+
+            for songlist_name in sftp_client.listdir(SERVER_SONGLIST_DIR):
+                sftp_client.get(SERVER_SONGLIST_DIR + songlist_name, os.path.join(SONGLISTS_DIR, songlist_name))
+
+
         # nahraje se pouze jeden soubor na server do slozky songs
         elif action == "upload_single_file":
             try:
@@ -1877,16 +1887,40 @@ def sls_update_queue_treeview():
         sls_queue_treeview.insert("", i, f"name{i}", text=name)
         sls_queue_treeview.item(f"name{i}", open=True)
         for j, section_tuple in zip(range(len(song_tuple[1])), song_tuple[1]):
+            stop_index = DISPLAYED_SONG_PART_LENGTH
+            if "\n" in section_tuple[1] and section_tuple[1].index("\n") < DISPLAYED_SONG_PART_LENGTH:
+                stop_index = section_tuple[1].index("\n")
+
+            text_part_to_insert = section_tuple[1][:stop_index]
             sls_queue_treeview.insert(
                 f"name{i}",
                 j,
                 f"section{i},{j}",
                 text=section_tuple[0]
                 + "   "
-                + section_tuple[1][:DISPLAYED_SONG_PART_LENGTH].strip()
+                + text_part_to_insert
                 + "...",
             )
     sls_update_slide("")
+
+def sls_update_songlist():
+    """Prida do songlist treeview senamy a pisne v nich"""
+    global songlist_list
+
+    songlist_list = os.listdir(SONGLISTS_DIR)
+
+    for item in sls_songlist_treeview.get_children():
+        sls_songlist_treeview.delete(item)
+
+    for i, songlist_name in zip(range(len(songlist_list)), songlist_list):
+        sls_songlist_treeview.insert("", END, f"listname{i}", text=songlist_name)
+        
+        # muselo by se vyresit odstraneni a jine veci idk, stejne to asi neni potreba
+        """with open(os.path.join(SONGLISTS_DIR, songlist_name), "r") as file:
+            songlist_content = file.readlines()
+        for j, song_name in zip(range(len(songlist_content)), songlist_content):
+            sls_songlist_treeview.insert(f"listname{i}", END, f"song{j}, {i}", text=song_name)
+            sls_songlist_treeview.item(f"song{j}, {i}", open=False)"""
 
 def ordered_section_list(section_list: list, order: str) -> list[tuple]:
     """- Z retezce poradi a seznamu slok sestavi serazeny seznam slok, kde se stejna sloka muze vyskytovat vicekrat
@@ -1955,6 +1989,7 @@ def sls_add_selected():
     sls_add_list_to_complete_list(song_path_list)
     
     file_tree.selection_remove(file_tree.selection())
+    sls_songlist_treeview.selection_remove(sls_songlist_treeview.selection())
 
 def sls_pure_image(color, event=None):
     """nastavi Canvas na bilou, cernou barvu nebo prazdny obrazek pozadi"""
@@ -2134,7 +2169,10 @@ def sls_update_slide(text: str):
     image = Image.open(os.path.join(SOURCE_DIR, BG_SLIDESHOW_IMAGE_NAME))
     slide_original_image = image.resize((size_x, size_y),Image.LANCZOS)
     obraz = ImageDraw.Draw(slide_original_image)
-    font = ImageFont.truetype(SLS_FONT_STYLE[0], int(SLS_FONT_STYLE[1]))
+    try:
+        font = ImageFont.truetype(SLS_FONT_STYLE[0], int(SLS_FONT_STYLE[1])) # Windows
+    except:
+        font = ImageFont.truetype(f"/usr/share/fonts/truetype/freefont/{SLS_FONT_STYLE[0]}", int(SLS_FONT_STYLE[1]), encoding="unic") # Unix
     # stin pisma, pokud je zapnuty
     if SLS_SHADOW_SIZE != 0:
         obraz.text((int(size_x/2) + int(SLS_SHADOW_SIZE),int(size_y/2) + int(SLS_SHADOW_SIZE)), processed_text, fill=SLS_SHADOW_COLOR, font=font,stroke_width=int(SLS_BORDER_SIZE), stroke_fill=SLS_SHADOW_COLOR, align=CENTER, anchor="mm")
@@ -2155,6 +2193,86 @@ def sls_update_slide(text: str):
     sls_preview_canvas.delete("all")
     sls_preview_canvas.image = preview_image
     sls_preview_canvas.create_image(0, 0, image=preview_image, anchor="nw")
+
+def sls_save_queue_to_songlist():
+    """Ulozi aktualni frontu do vybraneho seznamu pisni"""
+    if(not sls_songlist_treeview.selection()):
+        pop_info("Není vybraný žádný seznam.")
+        return
+
+    songlist_name = sls_songlist_treeview.item(sls_songlist_treeview.selection()[0])["text"]
+
+    prompt = messagebox.askyesno(title="Uložit",message=f"Seznam {songlist_name} bude přepsán. Pokračovat?")
+    if not prompt:
+        return
+
+    queue_items = sls_queue_treeview.get_children()
+
+    to_songlist_string = ""
+    for item in queue_items:
+        song_name = sls_queue_treeview.item(item)["text"]
+        if song_name != "Konec prezentace":
+            to_songlist_string += song_name + ".sbf\n"
+            
+    with open(os.path.join(SONGLISTS_DIR, songlist_name), "w") as file:
+        file.write(to_songlist_string)
+    
+    if online:
+        server_comunication(["upload_single_file"], [os.path.join(SONGLISTS_DIR, songlist_name)], [SERVER_SONGLIST_DIR + songlist_name])
+
+    pop_info(f"Uloženo do seznamu \"{songlist_name}\"")
+
+def sls_add_songlist_to_queue():
+    global actual_song_directory
+    if not sls_songlist_treeview.selection():
+        pop_info("Není vybraný žádný seznam.")
+        return
+        
+    songlist_name = sls_songlist_treeview.item(sls_songlist_treeview.selection()[0])["text"]
+
+    with open(os.path.join(SONGLISTS_DIR, songlist_name), "r") as file:
+        songs_list = file.readlines()
+    songs_path_list = [os.path.join(actual_song_directory, song_name.rstrip()) for song_name in songs_list]
+
+    # nacist pisne ze seznamu do queue treeview
+    sls_add_list_to_complete_list(songs_path_list, True)
+
+def sls_delete_songlist():
+    global online
+
+    if not sls_songlist_treeview.selection():
+        pop_info("Není vybraný žádný seznam.")
+        return
+
+    songlist_name = sls_songlist_treeview.item(sls_songlist_treeview.selection()[0])["text"]
+
+    delete = messagebox.askyesno(title="Odstranit",message=f"Odstranit {songlist_name}?")
+
+    if not delete:
+        return
+
+    # odstraneni
+    os.remove(os.path.join(SONGLISTS_DIR, songlist_name))
+    if online:
+        server_comunication(["remove_single_file"], [], [SERVER_SONGLIST_DIR + songlist_name])
+
+    sls_update_songlist()
+
+def sls_create_songlist():
+    global songlist_list
+    name = simpledialog.askstring(title="Nový seznam", prompt="Název seznamu:")
+    if name == None or name == "":
+        return
+    
+    if name in songlist_list:
+        pop_info("Seznam s tímto názvem existuje.")
+        return
+    
+    #vytvoreni souboru
+    with open(os.path.join(SONGLISTS_DIR, name), "w") as file:
+        pass
+
+    sls_update_songlist()
 
 def sls_tree_item_selected(event=None):
     """handler vybrani itemu z queue treeview, vola obnoveni slidu"""
@@ -2182,9 +2300,8 @@ def sls_tree_item_selected(event=None):
                 # nalezeni vybrane sloky
                 for section_tuple in song[1]:
                     if (
-                        section_tuple[0] in item_text
-                        and section_tuple[1][:DISPLAYED_SONG_PART_LENGTH].strip()
-                        in item_text
+                        section_tuple[0] == item_text[:len(str(section_tuple[0]))]
+                        #and section_tuple[1][:DISPLAYED_SONG_PART_LENGTH] in item_text
                     ):
                         section_text = section_tuple[1]
 
@@ -2215,12 +2332,15 @@ def sls_remove_selected():
             break
 
     sls_update_queue_treeview()
+    sls_songlist_treeview.selection_remove(sls_songlist_treeview.selection())
 
 #                          #
 ### SETTINGS MODE FUNKCE ###
 #                          #
 
 def stg_list_of_fonts():
+    if os.path.exists("/usr/share/fonts"):
+        return [fontname for fontname in os.listdir("/usr/share/fonts/truetype/freefont/") if fontname[-4:] == ".ttf"]
     return ['arial.ttf', 'ariali.ttf', 'arialbd.ttf', 'arialbi.ttf', 'ariblk.ttf', 'bahnschrift.ttf', 'calibril.ttf', 'calibrili.ttf', 'calibri.ttf', 'calibrii.ttf', 'calibrib.ttf', 'calibriz.ttf', 'cambriai.ttf', 'cambriab.ttf', 'cambriaz.ttf', 'comic.ttf', 'comici.ttf', 'comicbd.ttf', 'comicz.ttf', 'consola.ttf', 'consolai.ttf', 'consolab.ttf', 'consolaz.ttf', 'constan.ttf', 'constani.ttf', 'constanb.ttf', 'constanz.ttf', 'corbell.ttf', 'corbelli.ttf', 'corbel.ttf', 'corbeli.ttf', 'corbelb.ttf', 'corbelz.ttf', 'cour.ttf', 'couri.ttf', 'courbd.ttf', 'courbi.ttf', 'ebrima.ttf', 'ebrimabd.ttf', 'framd.ttf', 'framdit.ttf', 'georgia.ttf', 'georgiai.ttf', 'georgiab.ttf', 'georgiaz.ttf', 'impact.ttf', 'lucon.ttf', 'l_10646.ttf', 'phagspa.ttf', 'phagspab.ttf', 'micross.ttf', 'pala.ttf', 'palai.ttf', 'palab.ttf', 'palabi.ttf', 'segoepr.ttf', 'segoeprb.ttf', 'segoesc.ttf', 'segoescb.ttf', 'segoeuil.ttf', 'seguili.ttf', 'segoeuisl.ttf', 'seguisli.ttf', 'segoeui.ttf', 'segoeuii.ttf', 'seguisb.ttf', 'seguisbi.ttf', 'segoeuib.ttf', 'segoeuiz.ttf', 'sylfaen.ttf', 'tahoma.ttf', 'tahomabd.ttf', 'times.ttf', 'timesi.ttf', 'timesbd.ttf', 'timesbi.ttf', 'trebuc.ttf', 'trebucit.ttf', 'trebucbd.ttf', 'trebucbi.ttf', 'verdana.ttf', 'verdanai.ttf', 'verdanab.ttf', 'verdanaz.ttf']
 
 def stg_update_font_style(event = None):
@@ -2286,7 +2406,10 @@ def stg_update_preview_text():
     image = Image.open(os.path.join(SOURCE_DIR, BG_SLIDESHOW_IMAGE_NAME))
     slide_original_image = image.resize((1920, 1080),Image.LANCZOS)
     obraz = ImageDraw.Draw(slide_original_image)
-    font = ImageFont.truetype(SLS_FONT_STYLE[0], int(SLS_FONT_STYLE[1]))
+    try:
+        font = ImageFont.truetype(SLS_FONT_STYLE[0], int(SLS_FONT_STYLE[1]))
+    except:
+        font = ImageFont.truetype(f"/usr/share/fonts/truetype/freefont/{SLS_FONT_STYLE[0]}", int(SLS_FONT_STYLE[1]), encoding="unic") # Unix
     # stin pisma, pokud je zapnuty
     if SLS_SHADOW_SIZE != 0:
         obraz.text((int(1920/2) + int(SLS_SHADOW_SIZE),int(1080/2) + int(SLS_SHADOW_SIZE)), text, fill=SLS_SHADOW_COLOR, font=font,stroke_width=int(SLS_BORDER_SIZE), stroke_fill=SLS_SHADOW_COLOR, align=CENTER, anchor="mm")
@@ -2310,11 +2433,10 @@ if True:
     main_window = Tk()
     main_window.title(APP_NAME)
     main_window.minsize(800, 500)
-    try:
-        main_window.iconbitmap(SOURCE_DIR + "icon.ico")
-        main_window.state("zoomed")
-    except:
-        pass    
+    main_window.bind("<Control-Key-1>", func=lambda e: set_mode_handeler("edit"))
+    main_window.bind("<Control-Key-2>", func=lambda e: set_mode_handeler("slideshow"))
+    main_window.bind("<Control-Key-3>", func=lambda e: set_mode_handeler("songbook"))
+    main_window.bind("<Control-Key-4>", func=lambda e: set_mode_handeler("settings"))
 
     # pri pokusu o zavreni okna se zavola funkce on_closing
     main_window.protocol("WM_DELETE_WINDOW", on_closing)
@@ -2571,15 +2693,17 @@ if True:
 
     slideshow_mode_frame = Frame(main_frame)
 
-    slideshow_mode_frame.rowconfigure(0, weight = 1)
-    slideshow_mode_frame.columnconfigure(1,weight=2)
-    slideshow_mode_frame.columnconfigure(0,weight=1)
+    sls_queue_and_songlist_frame = Frame(slideshow_mode_frame, padx=2, pady=2)
+    sls_queue_and_songlist_frame.pack(side=LEFT, fill=Y)
 
-    sls_queue_treeview_frame = LabelFrame(slideshow_mode_frame, text="Fronta", padx=2, pady=2)
-    sls_queue_treeview_frame.grid(row=0, column=0, sticky = NSEW)
+    sls_queue_treeview_frame = LabelFrame(sls_queue_and_songlist_frame, text="Fronta", padx=2, pady=2, width = 300)
+    sls_queue_treeview_frame.pack(side=TOP, expand=1, fill=BOTH)
+
+    sls_songlist_frame = LabelFrame(sls_queue_and_songlist_frame, text = "Seznamy", padx = 2, pady = 2)
+    sls_songlist_frame.pack(side=BOTTOM, expand=1, fill=BOTH)
 
     sls_tools_n_preview_frame = Frame(slideshow_mode_frame)
-    sls_tools_n_preview_frame.grid(row=0, column=1, sticky = NSEW)
+    sls_tools_n_preview_frame.pack(side = RIGHT, fill = BOTH, expand=1)
 
     sls_tools_frame = LabelFrame(sls_tools_n_preview_frame, text = "Nástroje", padx = 2, pady = 2)
     sls_tools_frame.pack(fill = X, expand=0)
@@ -2612,6 +2736,18 @@ if True:
 
     sls_remove_selected_btn = Button(sls_queue_treeview_frame, text="Odstranit vybranou píseň", command=sls_remove_selected)
     sls_remove_selected_btn.pack(fill=X, expand=0, pady=2)
+    
+    sls_create_songlist_btn = Button(sls_songlist_frame, text="Vytvořit nový seznam", command=sls_create_songlist)
+    sls_create_songlist_btn.pack(fill=X, expand=0, pady=2)
+
+    sls_remove_songlist_btn = Button(sls_songlist_frame, text="Odstranit vybraný seznam", command=sls_delete_songlist)
+    sls_remove_songlist_btn.pack(fill=X, expand=0, pady=2)
+
+    sls_save_to_songlist_btn = Button(sls_songlist_frame, text="Uložit frontu do vybraného seznamu", command=sls_save_queue_to_songlist)
+    sls_save_to_songlist_btn.pack(fill=X, expand=0, pady=2)
+
+    sls_add_to_queue_btn = Button(sls_songlist_frame, text="Nahrát seznam do fronty", command=sls_add_songlist_to_queue)
+    sls_add_to_queue_btn.pack(fill=X, expand=0, pady=2)
 
     widget_default_color = sls_remove_selected_btn.cget("background")
 
@@ -2624,6 +2760,9 @@ if True:
     sls_queue_treeview.bind("<Down>", lambda e: "break")
     sls_queue_treeview.bind("<Return>", lambda e: "break")
     sls_queue_treeview.bind("<space>", lambda e: "break")
+
+    sls_songlist_treeview = ttk.Treeview(sls_songlist_frame, show="tree")
+    sls_songlist_treeview.pack(fill=BOTH, expand=1)
 
 ### ### ### UI pro tvorbu zpevniku ### ### ###
 if True:
@@ -2676,13 +2815,18 @@ if True:
 
     #
 
-date_time = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+try:
+    main_window.state("zoomed")
+    main_window.iconbitmap(SOURCE_DIR + "icon.ico")
+except:
+    main_window.attributes('-zoomed', True)
+
 # stahne do Online slozky pisne ze serveru a nejake source soubory
 if have_internet():
     server_comunication(
-        ["server_to_Online", "download_single_file", "download_single_file", "download_single_file"],
-        ["", SOURCE_DIR + LATEX_FORMAT_FILE_NAME, SOURCE_DIR + COLOR_FILE_NAME, SOURCE_DIR + HELP_TEXT_FILE_NAME],
-        ["", SERVER_SOURCE_LOCATION + LATEX_FORMAT_FILE_NAME, SERVER_SOURCE_LOCATION + COLOR_FILE_NAME, SERVER_SOURCE_LOCATION + HELP_TEXT_FILE_NAME],
+        ["server_to_Online", "download_single_file", "download_single_file", "download_single_file", "download_songlists"],
+        ["", SOURCE_DIR + LATEX_FORMAT_FILE_NAME, SOURCE_DIR + COLOR_FILE_NAME, SOURCE_DIR + HELP_TEXT_FILE_NAME, ""],
+        ["", SERVER_SOURCE_LOCATION + LATEX_FORMAT_FILE_NAME, SERVER_SOURCE_LOCATION + COLOR_FILE_NAME, SERVER_SOURCE_LOCATION + HELP_TEXT_FILE_NAME, ""],
     )
 
     update_status("Načítání uživatelského rozhraní ...")
@@ -2714,7 +2858,10 @@ if True:
     stg_font_combobox = ttk.Combobox(stg_options_frame)
     stg_font_combobox["values"] = stg_list_of_fonts()
     stg_font_combobox["state"] = "readonly"
-    stg_font_combobox.current(stg_list_of_fonts().index(SLS_FONT_STYLE[0]))
+    try:
+        stg_font_combobox.current(stg_list_of_fonts().index(SLS_FONT_STYLE[0]))
+    except:
+        stg_font_combobox.current(stg_list_of_fonts()[0])
     stg_font_combobox.pack(pady = 2)
     stg_font_combobox.bind("<<ComboboxSelected>>", func=stg_update_font_style)
 
@@ -2844,23 +2991,28 @@ sls_bind_list = [
     ["<Home>", lambda event: sls_change_slide("begin"), None]
 ]  # format seznamu: [[sequence, func, bind_id]
 sls_bind_list_on_mode_change = [
+    ["<F5>", sls_start_slideshow, None],
     ["<Control-Down>", lambda event: sls_change_slide("next"), None],
     ["<Control-Up>", lambda event: sls_change_slide("prev"), None]]
 
 # nastaveni souboru s cestou ERR_LOG_PATH jako chyboveho vystupu
 sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8")
 
-sys.stderr.write("-------------------------- "+ date_time+ " --------------------------\n")
+sys.stderr.write("-------------------------- "+ datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S") + " --------------------------\n")
+
+ttk.Style().configure("Treeview", rowheight = 25)
 
 # nahraje latex sablonu
 load_latex_template()
 
 update_internet_status()
-main_window.after(10000, call_update_internet_status)
+main_window.after(5000, call_update_internet_status)
 main_window.after(1000, start_autosave)
 
 # nacitani je hotove, tudiz se zapne GUI
 main_window.config(menu=menu)
+
+sls_update_songlist()
 
 set_mode_handeler("edit")
 update_status("Připraven")
