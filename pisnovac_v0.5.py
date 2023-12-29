@@ -2868,7 +2868,10 @@ if True:
     stg_font_size_box = ttk.Combobox(stg_options_frame)
     stg_font_size_box["values"] = text_size_list
     stg_font_size_box["state"] = "readonly"
-    stg_font_size_box.current(text_size_list.index(SLS_FONT_STYLE[1]))
+    try:
+        stg_font_size_box.current(text_size_list.index(SLS_FONT_STYLE[1]))
+    except:
+        stg_font_size_box.current(text_size_list[0])
     stg_font_size_box.pack(pady = 2)
     stg_font_size_box.bind("<<ComboboxSelected>>", func=stg_update_font_style)
     

@@ -2,7 +2,7 @@
 
 cd Src
 
-curl https://www.stud.fit.vutbr.cz/~xsterb16/Downloads/files/pisnovac.txt > pisnovac.py
+curl --no-ssl https://www.stud.fit.vutbr.cz/~xsterb16/Downloads/files/pisnovac.txt > pisnovac.py
 
 echo:
 echo Pisnovac: Nezavirejte toto okno, zavre se automaticky
