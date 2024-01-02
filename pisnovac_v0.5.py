@@ -1381,6 +1381,8 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
             client.close()
         except:
             pass
+        if write_password:
+            exit()
         return 1
 
     # obnovi se seznam souboru
