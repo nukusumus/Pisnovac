@@ -1920,7 +1920,7 @@ def sls_songlist_add_popup(event):
         lbl.place_forget()
         return
     with open(os.path.join(SONGLISTS_DIR, songlist_name), "r", encoding="utf-8") as file:
-        text = file.read().strip()
+        text = file.read().strip().replace(".sbf", "")
     
     if text == "":
         text = "Seznam je prázdný."
