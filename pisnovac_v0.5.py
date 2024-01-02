@@ -14,6 +14,7 @@ import datetime
 import subprocess
 import threading
 from screeninfo import get_monitors
+from idlelib.tooltip import Hovertip
 
 """
 Todo:
@@ -53,7 +54,7 @@ if not os.path.isdir(SOURCE_DIR) or not os.path.isfile(SOURCE_DIR + SETTINGS_FIL
     sys.exit(1)
 
 # nahrani veci z nastaveni
-with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r") as file:
+with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r", encoding="utf-8") as file:
     lines = file.readlines()
 SERVER_ADDRESS = lines[0].rstrip()
 USERNAME = lines[1].rstrip()
@@ -1368,10 +1369,10 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
 
         # napise do nastaveni heslo
         if write_password:
-            with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r") as file:
+            with open(SOURCE_DIR + SETTINGS_FILE_NAME, "r", encoding="utf-8") as file:
                 settings_lines = file.readlines()
             settings_lines[2] = PWD + "\n"
-            with open(SOURCE_DIR + SETTINGS_FILE_NAME, "w") as file:
+            with open(SOURCE_DIR + SETTINGS_FILE_NAME, "w", encoding="utf-8") as file:
                 file.writelines(settings_lines)
     except Exception as e:
         pop_error("Chyba připojení k serveru: " + str(e))
@@ -1917,6 +1918,8 @@ def sls_update_queue_treeview():
                 + text_part_to_insert
                 + "...",
             )
+            
+
     sls_update_slide("")
 
 def sls_update_songlist():
@@ -1932,7 +1935,7 @@ def sls_update_songlist():
         sls_songlist_treeview.insert("", END, f"listname{i}", text=songlist_name)
         
         # muselo by se vyresit odstraneni a jine veci idk, stejne to asi neni potreba
-        """with open(os.path.join(SONGLISTS_DIR, songlist_name), "r") as file:
+        """with open(os.path.join(SONGLISTS_DIR, songlist_name), "r", encoding="utf-8") as file:
             songlist_content = file.readlines()
         for j, song_name in zip(range(len(songlist_content)), songlist_content):
             sls_songlist_treeview.insert(f"listname{i}", END, f"song{j}, {i}", text=song_name)
@@ -2230,7 +2233,7 @@ def sls_save_queue_to_songlist():
         if song_name != "Konec prezentace":
             to_songlist_string += song_name + ".sbf\n"
             
-    with open(os.path.join(SONGLISTS_DIR, songlist_name), "w") as file:
+    with open(os.path.join(SONGLISTS_DIR, songlist_name), "w", encoding="utf-8") as file:
         file.write(to_songlist_string)
     
     if online:
@@ -2246,7 +2249,7 @@ def sls_add_songlist_to_queue():
         
     songlist_name = sls_songlist_treeview.item(sls_songlist_treeview.selection()[0])["text"]
 
-    with open(os.path.join(SONGLISTS_DIR, songlist_name), "r") as file:
+    with open(os.path.join(SONGLISTS_DIR, songlist_name), "r", encoding="utf-8") as file:
         songs_list = file.readlines()
     songs_path_list = [os.path.join(actual_song_directory, song_name.rstrip()) for song_name in songs_list]
 
@@ -2285,8 +2288,11 @@ def sls_create_songlist():
         return
     
     #vytvoreni souboru
-    with open(os.path.join(SONGLISTS_DIR, name), "w") as file:
-        pass
+    with open(os.path.join(SONGLISTS_DIR, name), "w", encoding="utf-8") as file:
+        pass # pouze vytvori seznam
+
+    if online:
+        server_comunication(["upload_single_file"], [os.path.join(SONGLISTS_DIR, name)], [SERVER_SONGLIST_DIR + name])
 
     sls_update_songlist()
 
@@ -2364,7 +2370,7 @@ def stg_update_font_style(event = None):
     global SLS_FONT_COLOR, SLS_FONT_STYLE, SLS_SHADOW_COLOR, SLS_SHADOW_SIZE, SLS_BORDER_COLOR, SLS_BORDER_SIZE
 
     # zapise hodnoty do nastaveni
-    with open(os.path.join(SOURCE_DIR,SETTINGS_FILE_NAME), "r") as file:
+    with open(os.path.join(SOURCE_DIR,SETTINGS_FILE_NAME), "r", encoding="utf-8") as file:
         lines_list = file.readlines()
     # ctvrty radek = tuple se stylem
     lines_list[4] = f"{stg_font_combobox.get()},{stg_font_size_box.get()}\n"
@@ -2372,7 +2378,7 @@ def stg_update_font_style(event = None):
     lines_list[6] = f"{STG_COLOR_DICT[stg_shadow_color_box.get()]},{stg_shadow_size_box.get()}\n"
     lines_list[7] = f"{STG_COLOR_DICT[stg_border_color_box.get()]},{stg_border_size_box.get()}\n"
 
-    with open(os.path.join(SOURCE_DIR,SETTINGS_FILE_NAME), "w") as file:
+    with open(os.path.join(SOURCE_DIR,SETTINGS_FILE_NAME), "w", encoding="utf-8") as file:
         file.writelines(lines_list)
 
     # ulozi do promennych
@@ -2884,7 +2890,7 @@ if True:
     try:
         stg_font_combobox.current(stg_list_of_fonts().index(SLS_FONT_STYLE[0]))
     except:
-        stg_font_combobox.current(stg_list_of_fonts()[0])
+        stg_font_combobox.current(0)
     stg_font_combobox.pack(pady = 2)
     stg_font_combobox.bind("<<ComboboxSelected>>", func=stg_update_font_style)
 
@@ -2894,7 +2900,7 @@ if True:
     try:
         stg_font_size_box.current(text_size_list.index(SLS_FONT_STYLE[1]))
     except:
-        stg_font_size_box.current(text_size_list[0])
+        stg_font_size_box.current(0)
     stg_font_size_box.pack(pady = 2)
     stg_font_size_box.bind("<<ComboboxSelected>>", func=stg_update_font_style)
     
@@ -3039,6 +3045,9 @@ main_window.after(1000, start_autosave)
 main_window.config(menu=menu)
 
 sls_update_songlist()
+
+# aktualizuje font style podle vyberu
+stg_update_font_style()
 
 set_mode_handeler("edit")
 update_status("Připraven")
