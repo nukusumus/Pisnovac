@@ -14,7 +14,6 @@ import datetime
 import subprocess
 import threading
 from screeninfo import get_monitors
-from idlelib.tooltip import Hovertip
 
 """
 Todo:
@@ -37,7 +36,7 @@ DEFAULT_SLIDESHOW_IMAGE_NAME = "background_default.jpg"
 HELP_TEXT_FILE_NAME = "help_text.txt"
 COLOR_FILE_NAME = "colors.txt"
 
-DISPLAYED_SONG_PART_LENGTH = 28 # idk asi idealni delka
+DISPLAYED_SONG_PART_LENGTH = 20 # idk asi idealni delka
 
 HOME_DIR = os.path.expanduser(f"~{os.sep}Documents{os.sep}Pisnovac{os.sep}")
 SOURCE_DIR = HOME_DIR + f"Src{os.sep}"
@@ -1884,6 +1883,51 @@ def sls_exit_mode():
     if len(get_sub_children()) > 0:
         sls_queue_treeview.selection_set(get_sub_children()[0])
 
+def sls_queue_add_popup(event):
+    """zobrazi popup s celym textem sloky"""
+    tree = event.widget
+    item = tree.identify_row(event.y)
+    text = sls_get_item_full_text(item)
+    if text != "":
+        lbl.config(text = text)
+        lbl.place(x=main_window.winfo_pointerx(), y=main_window.winfo_pointery())
+    else:
+        lbl.place_forget()
+
+    main_window.after(500, lambda: sls_remove_popup(event.widget))
+
+def sls_remove_popup(widget):
+    """pokud pointer neni v danem widgetu, odstrani label"""
+    x = main_window.winfo_pointerx()
+    x1=widget.winfo_rootx()
+    x2=widget.winfo_rootx() + widget.winfo_width()
+
+    y = main_window.winfo_pointery()
+    y1=widget.winfo_rooty()
+    y2=widget.winfo_rooty() + widget.winfo_height()
+
+    if x not in range(x1, x2) or y not in range(y1, y2):
+        lbl.place_forget()
+
+def sls_songlist_add_popup(event):
+    """zobrazi popup s celym textem sloky"""
+    tree = event.widget
+    item = tree.identify_row(event.y)
+    songlist_name = tree.item(item, "text")
+    if songlist_name == "":
+        lbl.place_forget()
+        return
+    with open(os.path.join(SONGLISTS_DIR, songlist_name), "r", encoding="utf-8") as file:
+        text = file.read().strip()
+    
+    if text == "":
+        text = "Seznam je prázdný."
+
+    lbl.config(text = text)
+    lbl.place(x=main_window.winfo_pointerx(), y=main_window.winfo_pointery())
+
+    main_window.after(500, lambda: sls_remove_popup(event.widget))
+
 def sls_update_queue_treeview():
     """aktualizuje treeview pisni k promitani, prida na konec prazdnou polozku "Konec prezentace" """
     global sls_complete_list
@@ -1919,7 +1963,6 @@ def sls_update_queue_treeview():
                 + "...",
             )
             
-
     sls_update_slide("")
 
 def sls_update_songlist():
@@ -2296,18 +2339,9 @@ def sls_create_songlist():
 
     sls_update_songlist()
 
-def sls_tree_item_selected(event=None):
-    """handler vybrani itemu z queue treeview, vola obnoveni slidu"""
-
-    # kdyz je focus na treeview, zachytava eventy a nefunguji bindy
-    main_window.focus()
-    if not sls_queue_treeview.selection():
-        return
-
-    item = sls_queue_treeview.selection()[0]
+def sls_get_item_full_text(item):
+    """z itemu queue treeviewu ziska plny text slidu"""
     parent = sls_queue_treeview.parent(item)
-
-    section_text = ""  # obsah prazdneho slidu
 
     # pokud existuje parent item, tzn je vybrana nejaka sloka
     if parent:
@@ -2325,7 +2359,19 @@ def sls_tree_item_selected(event=None):
                         section_tuple[0] == item_text[:len(str(section_tuple[0]))]
                         #and section_tuple[1][:DISPLAYED_SONG_PART_LENGTH] in item_text
                     ):
-                        section_text = section_tuple[1]
+                        return section_tuple[1].strip()
+    
+    return ""
+
+def sls_tree_item_selected(event=None):
+    """handler vybrani itemu z queue treeview, vola obnoveni slidu"""
+    # kdyz je focus na treeview, zachytava eventy a nefunguji bindy
+    main_window.focus()
+
+    if not sls_queue_treeview.selection():
+        return
+    
+    section_text = sls_get_item_full_text(sls_queue_treeview.selection()[0])
 
     sls_update_slide(section_text)
 
@@ -2783,6 +2829,10 @@ if True:
     sls_queue_treeview.bind("<Return>", lambda e: "break")
     sls_queue_treeview.bind("<space>", lambda e: "break")
 
+    sls_queue_treeview.tag_configure("highlight", background="#deca7c")
+    sls_queue_treeview.bind("<Motion>", sls_queue_add_popup)
+    lbl=Label(main_window,bg="#deca7c", font=SLS_FONT_STYLE[0] + " 20")
+
     # #popup menu na prave tlacitko
     # sls_queue_menu = Menu(main_window, tearoff = 0) 
     # sls_queue_menu.add_command(label ="Odstranit", command=sls_popup_cmd_remove)
@@ -2792,6 +2842,9 @@ if True:
 
     sls_songlist_treeview = ttk.Treeview(sls_songlist_frame, show="tree")
     sls_songlist_treeview.pack(fill=BOTH, expand=1)
+
+    sls_songlist_treeview.tag_configure("highlight", background="#deca7c")
+    sls_songlist_treeview.bind("<Motion>", sls_songlist_add_popup)
 
 ### ### ### UI pro tvorbu zpevniku ### ### ###
 if True:
@@ -3028,7 +3081,7 @@ sls_bind_list_on_mode_change = [
     ["<Control-Up>", lambda event: sls_change_slide("prev"), None]]
 
 # nastaveni souboru s cestou ERR_LOG_PATH jako chyboveho vystupu
-sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8")
+#sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8") TODO
 
 sys.stderr.write("-------------------------- "+ datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S") + " --------------------------\n")
 
