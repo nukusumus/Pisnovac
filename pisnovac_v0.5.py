@@ -1839,23 +1839,6 @@ def sbk_export_tex():
 #                           #
 ### SLIDESHOW MODE FUNKCE ###
 #                           #
-
-# TODO
-# def sls_popup(event):
-#     try: 
-#         sls_queue_menu.tk_popup(event.x_root, event.y_root) 
-#     finally: 
-#         sls_queue_menu.grab_release()
-
-# def sls_popup_cmd_move_down():
-#     print("down")
-
-# def sls_popup_cmd_move_up():
-#     print("up")
-
-# def sls_popup_cmd_remove():
-#     print("remove")
-
 def sls_setup_preview():
     """nastavi nahled prezentace"""
     global preview_image
@@ -2831,21 +2814,12 @@ if True:
     sls_queue_treeview.bind("<Return>", lambda e: "break")
     sls_queue_treeview.bind("<space>", lambda e: "break")
 
-    sls_queue_treeview.tag_configure("highlight", background="#deca7c")
     sls_queue_treeview.bind("<Motion>", sls_queue_add_popup)
     lbl=Label(main_window,bg="#deca7c", font=SLS_FONT_STYLE[0] + " 20")
-
-    # #popup menu na prave tlacitko
-    # sls_queue_menu = Menu(main_window, tearoff = 0) 
-    # sls_queue_menu.add_command(label ="Odstranit", command=sls_popup_cmd_remove)
-    # sls_queue_menu.add_command(label ="Posunout výše", command=sls_popup_cmd_move_up)
-    # sls_queue_menu.add_command(label ="Posunout níže", command=sls_popup_cmd_move_down)
-    # sls_queue_treeview.bind("<Button-3>", sls_popup)
 
     sls_songlist_treeview = ttk.Treeview(sls_songlist_frame, show="tree")
     sls_songlist_treeview.pack(fill=BOTH, expand=1)
 
-    sls_songlist_treeview.tag_configure("highlight", background="#deca7c")
     sls_songlist_treeview.bind("<Motion>", sls_songlist_add_popup)
 
 ### ### ### UI pro tvorbu zpevniku ### ### ###
