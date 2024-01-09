@@ -3057,11 +3057,12 @@ sls_bind_list_on_mode_change = [
     ["<Control-Up>", lambda event: sls_change_slide("prev"), None]]
 
 # nastaveni souboru s cestou ERR_LOG_PATH jako chyboveho vystupu
-#sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8") TODO
+sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8")
 
 sys.stderr.write("-------------------------- "+ datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S") + " --------------------------\n")
 
-ttk.Style().configure("Treeview", rowheight = 25)
+if os.pathsep == "/":
+    ttk.Style().configure("Treeview", rowheight = 25)
 
 # nahraje latex sablonu
 load_latex_template()
