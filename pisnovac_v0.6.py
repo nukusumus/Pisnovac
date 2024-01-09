@@ -1840,11 +1840,12 @@ def sbk_export_tex():
 def sls_queue_popup_menu(event):
     global popup_menu_item
     popup_menu_item = sls_queue_treeview.identify_row(event.y)
-    if not popup_menu_item: # neni nic vybraneho
+    if not popup_menu_item or sls_queue_treeview.item(popup_menu_item)["text"] == "Konec prezentace":
         popup_menu_item = None
         return
-    
+
     lbl.place_forget()
+
     parent = sls_queue_treeview.parent(popup_menu_item)
     if parent:
         sls_queue_treeview.selection_set(parent)
@@ -1875,7 +1876,7 @@ def sls_queue_popup_cmd_move_down():
             break
     
     # kontrola
-    if cur_index == len(sls_complete_list) - 1 or cur_index == -1:
+    if cur_index == len(sls_complete_list) - 1:
         pop_info("Nelze")
         return
     
@@ -1904,9 +1905,9 @@ def sls_queue_popup_cmd_move_up():
         if song[0] == song_name:
             cur_index = sls_complete_list.index(song)
             break
-    
+
     # kontrola
-    if cur_index <= 0:
+    if cur_index == 0:
         pop_info("Nelze")
         return
     
