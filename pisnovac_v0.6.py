@@ -15,7 +15,7 @@ import subprocess
 import threading
 from screeninfo import get_monitors
 
-VERSION = "0.5.1"
+VERSION = "0.6.0"
 
 ### KONSTANTY ###
 APP_NAME = "Písňovač"
@@ -1839,34 +1839,148 @@ def sbk_export_tex():
 # pro frontu
 def sls_queue_popup_menu(event):
     global popup_menu_item
+    popup_menu_item = sls_queue_treeview.identify_row(event.y)
+    if not popup_menu_item: # neni nic vybraneho
+        popup_menu_item = None
+        return
+    
+    lbl.place_forget()
+
     try: 
         sls_queue_menu.tk_popup(event.x_root, event.y_root) 
     finally: 
         sls_queue_menu.grab_release()
-    tree = event.widget
-    item = tree.identify_row(event.y)
 
 def sls_queue_popup_cmd_move_down():
-    print("down")
+    global popup_menu_item, sls_complete_list
+    if popup_menu_item is None:
+        return
+    
+    parent = sls_queue_treeview.parent(popup_menu_item)
+    if parent:
+        song_name = sls_queue_treeview.item(parent)["text"]
+    else:
+        song_name = sls_queue_treeview.item(popup_menu_item)["text"]
+
+    # ziskani indexu
+    cur_index = -1
+    for song in sls_complete_list:
+        if song[0] == song_name:
+            cur_index = sls_complete_list.index(song)
+    
+    # kontrola
+    if cur_index == len(sls_complete_list) - 1:
+        pop_info("Nelze")
+        return
+    
+    # prohozeni
+    tmp = sls_complete_list[cur_index + 1]
+    sls_complete_list[cur_index + 1] = sls_complete_list[cur_index]
+    sls_complete_list[cur_index] = tmp
+
+    sls_update_queue_treeview()
+    sls_songlist_treeview.selection_remove(sls_songlist_treeview.selection())
 
 def sls_queue_popup_cmd_move_up():
-    print("up")
+    global popup_menu_item
+    if popup_menu_item is None:
+        return
+    
+    parent = sls_queue_treeview.parent(popup_menu_item)
+    if parent:
+        song_name = sls_queue_treeview.item(parent)["text"]
+    else:
+        song_name = sls_queue_treeview.item(popup_menu_item)["text"]
+
+    # ziskani indexu
+    cur_index = -1
+    for song in sls_complete_list:
+        if song[0] == song_name:
+            cur_index = sls_complete_list.index(song)
+    
+    # kontrola
+    if cur_index == 0:
+        pop_info("Nelze")
+        return
+    
+    # prohozeni
+    tmp = sls_complete_list[cur_index - 1]
+    sls_complete_list[cur_index - 1] = sls_complete_list[cur_index]
+    sls_complete_list[cur_index] = tmp
+
+    sls_update_queue_treeview()
+    sls_songlist_treeview.selection_remove(sls_songlist_treeview.selection())
 
 def sls_queue_popup_cmd_remove():
-    print("remove")
+    global popup_menu_item
+    if popup_menu_item is None:
+        return
+    
+    parent = sls_queue_treeview.parent(popup_menu_item)
+    if parent:
+        song_name = sls_queue_treeview.item(parent)["text"]
+    else:
+        song_name = sls_queue_treeview.item(popup_menu_item)["text"]
+    
+    # nalezeni odpovidajici pisne v sls_complete_list, song[0] je nazev:
+    for song in sls_complete_list:
+        if song[0] == song_name:
+            sls_complete_list.remove(song)
+            break
+
+    sls_update_queue_treeview()
+    sls_songlist_treeview.selection_remove(sls_songlist_treeview.selection())
+    
+
+    popup_menu_item = None
 
 # pro songlist
 def sls_songlist_popup_menu(event):
+    global popup_menu_item
+    popup_menu_item = sls_songlist_treeview.identify_row(event.y)
+    if not popup_menu_item: # neni nic vybraneho
+        popup_menu_item = None
+        return
+    
+    lbl.place_forget()
+
     try: 
         sls_songlist_menu.tk_popup(event.x_root, event.y_root) 
     finally: 
         sls_songlist_menu.grab_release()
 
 def sls_songlist_popup_cmd_remove():
-    print("remove")
+    global popup_menu_item
+    if popup_menu_item is None:
+        return
+    
+    songlist_name = sls_songlist_treeview.item(popup_menu_item)["text"]
+
+    delete = messagebox.askyesno(title="Odstranit",message=f"Odstranit {songlist_name}?")
+
+    if not delete:
+        return
+
+    # odstraneni
+    os.remove(os.path.join(SONGLISTS_DIR, songlist_name))
+    if online:
+        server_comunication(["remove_single_file"], [], [SERVER_SONGLIST_DIR + songlist_name])
+
+    sls_update_songlist()
 
 def sls_songlist_popup_cmd_to_queue():
-    print("remove")
+    global popup_menu_item
+    if popup_menu_item is None:
+        return
+    
+    songlist_name = sls_songlist_treeview.item(popup_menu_item)["text"]
+
+    with open(os.path.join(SONGLISTS_DIR, songlist_name), "r", encoding="utf-8") as file:
+        songs_list = file.readlines()
+    songs_path_list = [os.path.join(actual_song_directory, song_name.rstrip()) for song_name in songs_list]
+
+    # nacist pisne ze seznamu do queue treeview
+    sls_add_list_to_complete_list(songs_path_list, True)
 
 #
 
@@ -2166,7 +2280,6 @@ def sls_start_slideshow(event=None):
         pop_info("Žádné písně k prezentaci")
         return
 
-    sls_remove_selected_btn.config(state=DISABLED)
     sls_add_selected_btn.config(state=DISABLED)
     sls_start_slideshow_btn.config(state=DISABLED)
 
@@ -2199,7 +2312,6 @@ def sls_end_slideshow(event=None):
     for item in sls_bind_list:
         main_window.unbind(item[0])
 
-    sls_remove_selected_btn.config(state=NORMAL)
     sls_add_selected_btn.config(state=NORMAL)
     sls_start_slideshow_btn.config(state=NORMAL)
 
@@ -2300,42 +2412,6 @@ def sls_save_queue_to_songlist():
 
     pop_info(f"Uloženo do seznamu \"{songlist_name}\"")
 
-def sls_add_songlist_to_queue():
-    global actual_song_directory
-    if not sls_songlist_treeview.selection():
-        pop_info("Není vybraný žádný seznam.")
-        return
-        
-    songlist_name = sls_songlist_treeview.item(sls_songlist_treeview.selection()[0])["text"]
-
-    with open(os.path.join(SONGLISTS_DIR, songlist_name), "r", encoding="utf-8") as file:
-        songs_list = file.readlines()
-    songs_path_list = [os.path.join(actual_song_directory, song_name.rstrip()) for song_name in songs_list]
-
-    # nacist pisne ze seznamu do queue treeview
-    sls_add_list_to_complete_list(songs_path_list, True)
-
-def sls_delete_songlist():
-    global online
-
-    if not sls_songlist_treeview.selection():
-        pop_info("Není vybraný žádný seznam.")
-        return
-
-    songlist_name = sls_songlist_treeview.item(sls_songlist_treeview.selection()[0])["text"]
-
-    delete = messagebox.askyesno(title="Odstranit",message=f"Odstranit {songlist_name}?")
-
-    if not delete:
-        return
-
-    # odstraneni
-    os.remove(os.path.join(SONGLISTS_DIR, songlist_name))
-    if online:
-        server_comunication(["remove_single_file"], [], [SERVER_SONGLIST_DIR + songlist_name])
-
-    sls_update_songlist()
-
 def sls_create_songlist():
     global songlist_list
     name = simpledialog.askstring(title="Nový seznam", prompt="Název seznamu:")
@@ -2371,10 +2447,7 @@ def sls_get_item_full_text(item):
             if song[0] == parent_text:
                 # nalezeni vybrane sloky
                 for section_tuple in song[1]:
-                    if (
-                        section_tuple[0] == item_text[:len(str(section_tuple[0]))]
-                        #and section_tuple[1][:DISPLAYED_SONG_PART_LENGTH] in item_text
-                    ):
+                    if section_tuple[0] == item_text[:len(str(section_tuple[0]))]:
                         return section_tuple[1].strip()
     
     return ""
@@ -2390,33 +2463,6 @@ def sls_tree_item_selected(event=None):
     section_text = sls_get_item_full_text(sls_queue_treeview.selection()[0])
 
     sls_update_slide(section_text)
-
-def sls_remove_selected():
-    """odstrani rodice vybraneho itemu v sls_treeeview z sls_complete_list a obnovi sls_queue_treeview"""
-    selection = sls_queue_treeview.selection()
-    if not selection:
-        return
-
-    item = sls_queue_treeview.selection()[0]
-    parent = sls_queue_treeview.parent(item)
-
-    # pokud existuje parent item, tzn je vybrana nejaka sloka
-    if parent:
-        # nacteni textu jeho rodice
-        parent_text = sls_queue_treeview.item(parent)["text"]
-
-    # neexistuje rodic = je vybran nazev pisne
-    else:
-        parent_text = sls_queue_treeview.item(item)["text"]
-
-    # nalezeni odpovidajici pisne v sls_complete_list, song[0] je nazev:
-    for song in sls_complete_list:
-        if song[0] == parent_text:
-            sls_complete_list.remove(song)
-            break
-
-    sls_update_queue_treeview()
-    sls_songlist_treeview.selection_remove(sls_songlist_treeview.selection())
 
 #                          #
 ### SETTINGS MODE FUNKCE ###
@@ -2817,23 +2863,14 @@ if True:
 
     sls_start_slideshow_btn = Button(sls_queue_treeview_frame, text="Spustit prezentaci", command=sls_start_slideshow)
     sls_start_slideshow_btn.pack(fill=X, expand=0, pady=2)
-
-    sls_remove_selected_btn = Button(sls_queue_treeview_frame, text="Odstranit vybranou píseň", command=sls_remove_selected)
-    sls_remove_selected_btn.pack(fill=X, expand=0, pady=2)
     
     sls_create_songlist_btn = Button(sls_songlist_frame, text="Vytvořit nový seznam", command=sls_create_songlist)
     sls_create_songlist_btn.pack(fill=X, expand=0, pady=2)
 
-    sls_remove_songlist_btn = Button(sls_songlist_frame, text="Odstranit vybraný seznam", command=sls_delete_songlist)
-    sls_remove_songlist_btn.pack(fill=X, expand=0, pady=2)
-
     sls_save_to_songlist_btn = Button(sls_songlist_frame, text="Uložit frontu do vybraného seznamu", command=sls_save_queue_to_songlist)
     sls_save_to_songlist_btn.pack(fill=X, expand=0, pady=2)
 
-    sls_add_to_queue_btn = Button(sls_songlist_frame, text="Nahrát seznam do fronty", command=sls_add_songlist_to_queue)
-    sls_add_to_queue_btn.pack(fill=X, expand=0, pady=2)
-
-    widget_default_color = sls_remove_selected_btn.cget("background")
+    widget_default_color = sls_start_slideshow_btn.cget("background")
 
     sls_queue_treeview = ttk.Treeview(sls_queue_treeview_frame, show="tree")
     sls_queue_treeview.pack(fill=BOTH, expand=1)
@@ -2850,9 +2887,9 @@ if True:
     
     # popup menu na prave tlacitko pro frontu
     sls_queue_menu = Menu(main_window, tearoff = 0) 
-    sls_queue_menu.add_command(label ="Odstranit", command=sls_queue_popup_cmd_remove())
-    sls_queue_menu.add_command(label ="Posunout výše", command=sls_queue_popup_cmd_move_up())
-    sls_queue_menu.add_command(label ="Posunout níže", command=sls_queue_popup_cmd_move_down())
+    sls_queue_menu.add_command(label ="Odstranit", command=sls_queue_popup_cmd_remove)
+    sls_queue_menu.add_command(label ="Posunout výše", command=sls_queue_popup_cmd_move_up)
+    sls_queue_menu.add_command(label ="Posunout níže", command=sls_queue_popup_cmd_move_down)
     sls_queue_treeview.bind("<Button-3>", sls_queue_popup_menu)
 
     sls_songlist_treeview = ttk.Treeview(sls_songlist_frame, show="tree")
@@ -2864,8 +2901,8 @@ if True:
 
     # popup menu na prave tlacitko pro frontu
     sls_songlist_menu = Menu(main_window, tearoff = 0) 
-    sls_songlist_menu.add_command(label ="Odstranit", command=sls_songlist_popup_cmd_remove())
-    sls_songlist_menu.add_command(label ="Nahrát do fronty", command=sls_songlist_popup_cmd_to_queue())
+    sls_songlist_menu.add_command(label ="Odstranit", command=sls_songlist_popup_cmd_remove)
+    sls_songlist_menu.add_command(label ="Nahrát do fronty", command=sls_songlist_popup_cmd_to_queue)
     sls_songlist_treeview.bind("<Button-3>", sls_songlist_popup_menu)
     
 
