@@ -1948,6 +1948,8 @@ def sls_songlist_popup_menu(event):
         sls_songlist_menu.tk_popup(event.x_root, event.y_root) 
     finally: 
         sls_songlist_menu.grab_release()
+    
+    sls_songlist_treeview.selection_set(popup_menu_item)
 
 def sls_songlist_popup_cmd_remove():
     global popup_menu_item
@@ -3143,7 +3145,7 @@ sls_bind_list_on_mode_change = [
     ["<Control-Up>", lambda event: sls_change_slide("prev"), None]]
 
 # nastaveni souboru s cestou ERR_LOG_PATH jako chyboveho vystupu
-# sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8") #TODO
+sys.stderr = open(ERR_LOG_PATH, "a", encoding="utf-8")
 
 sys.stderr.write("-------------------------- "+ datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S") + " --------------------------\n")
 
