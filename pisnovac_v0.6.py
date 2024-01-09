@@ -1845,6 +1845,11 @@ def sls_queue_popup_menu(event):
         return
     
     lbl.place_forget()
+    parent = sls_queue_treeview.parent(popup_menu_item)
+    if parent:
+        sls_queue_treeview.selection_set(parent)
+    else:
+        sls_queue_treeview.selection_set(popup_menu_item)
 
     try: 
         sls_queue_menu.tk_popup(event.x_root, event.y_root) 
@@ -1867,9 +1872,10 @@ def sls_queue_popup_cmd_move_down():
     for song in sls_complete_list:
         if song[0] == song_name:
             cur_index = sls_complete_list.index(song)
+            break
     
     # kontrola
-    if cur_index == len(sls_complete_list) - 1:
+    if cur_index == len(sls_complete_list) - 1 or cur_index == -1:
         pop_info("Nelze")
         return
     
@@ -1897,9 +1903,10 @@ def sls_queue_popup_cmd_move_up():
     for song in sls_complete_list:
         if song[0] == song_name:
             cur_index = sls_complete_list.index(song)
+            break
     
     # kontrola
-    if cur_index == 0:
+    if cur_index <= 0:
         pop_info("Nelze")
         return
     
@@ -1943,13 +1950,12 @@ def sls_songlist_popup_menu(event):
         return
     
     lbl.place_forget()
+    sls_songlist_treeview.selection_set(popup_menu_item)
 
     try: 
         sls_songlist_menu.tk_popup(event.x_root, event.y_root) 
     finally: 
         sls_songlist_menu.grab_release()
-    
-    sls_songlist_treeview.selection_set(popup_menu_item)
 
 def sls_songlist_popup_cmd_remove():
     global popup_menu_item
