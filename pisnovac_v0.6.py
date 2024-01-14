@@ -227,7 +227,7 @@ def parse_sections(text):
 
             # pokud se uz nacetla nejaka sloka, ulozi se
             if len(section_text) > 0:
-                parsed_list.append((section_name, section_text))
+                parsed_list.append((section_name, section_text.strip()))
                 section_text = ""
                 section_name = ""
             continue
@@ -241,7 +241,7 @@ def parse_sections(text):
 
     # na konci souboru se ulozi posledni sloka, ktera jiz neni ukoncena dalsim nazvem sloky
     if len(section_text) > 0:
-        parsed_list.append((section_name, section_text))
+        parsed_list.append((section_name, section_text.strip()))
     return parsed_list
 
 def parse_text(content) -> tuple:
