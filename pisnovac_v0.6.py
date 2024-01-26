@@ -15,7 +15,7 @@ import subprocess
 import threading
 from screeninfo import get_monitors
 
-VERSION = "0.6.0"
+VERSION = "0.6.1"
 
 ### KONSTANTY ###
 APP_NAME = "Písňovač"
@@ -1087,7 +1087,7 @@ def update_screen():
 
     # zapne keybindy
     for bind_data in keybind_list:
-        bind_data[2] = main_window.bind(bind_data[0], bind_data[1])
+        bind_data[2] = main_window.bind(bind_data[0], bind_data[1], add=None)
 
     # neni otevreny soubor
     if editing_file_path == "":
@@ -3125,6 +3125,7 @@ widgets_to_disable_enable = [
 keybind_list = [
     ["<Control-w>", lambda event: close_song(), None, True],
     ["<Control-e>", lambda event: add_symbols("[]", True), None, True],
+    ["<Control-m>", lambda event: add_symbols("[]", True), None, True],
     ["<Control-n>", lambda event: new_song(), None, False],
     ["<Control-r>", lambda event: update_output_view(), None, True],
     ["<Control-z>", lambda event: history_undo(), None, True],
