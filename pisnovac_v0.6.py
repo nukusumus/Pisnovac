@@ -15,7 +15,7 @@ import subprocess
 import threading
 from screeninfo import get_monitors
 
-VERSION = "0.6.1"
+VERSION = "0.6.2"
 
 ### KONSTANTY ###
 APP_NAME = "Písňovač"
@@ -1417,14 +1417,6 @@ def server_comunication(action_list=[], local_path_list=[], server_path_list=[],
                     ),
                 )
                 time.sleep(0.2)
-
-                # vytvoreni zalohy pokud je to .sbf
-                if os.path.basename(local_path)[-4:] == ".sbf":
-                    update_status("Vytváření zálohy ...")
-                    sftp_client.put(local_path,SERVER_BACKUP_LOCATION + 
-                                    os.path.basename(server_path) + "_" + os.path.expanduser("~/").replace("/", "") + "_" +
-                                    datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S"))
-                    time.sleep(0.2)
             except Exception as e:
                 pop_error("Chyba:\n\n" + str(e))
                 sys.stderr.write(str(e))
