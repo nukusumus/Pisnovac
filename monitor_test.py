@@ -1,31 +1,34 @@
 from screeninfo import get_monitors
 from tkinter import *
+import time
 
-def change_geom():
-    global male
-    
-    if male:
-        root.geometry("200x200+0+0")
-        lbl.config(text="0")
-        male = False
+
+def switch_mon(mon):
+    global root
+
+    # root.state(NORMAL)
+
+    s = f"{mon.width}x{mon.height}+{mon.x}+{mon.y}"
+    print(s)
+
+    root.geometry(s)
+    #root.state("zoomed")
+
+def zoom():
+    global zoomed
+    if zoomed:
+        root.state(NORMAL)
     else:
-        root.geometry("200x200+20+20")
-        lbl.config(text="20")
-        male = True
-
-    root.after(2000, change_geom)
+        root.state("zoomed")
+    zoomed = not zoomed
 
 root = Tk()
-male = False
-lbl = Label(root, text = "starting", font=("40"))
-lbl.pack()
-root.after(2000, change_geom)
-print(get_monitors())
+
+mon =  get_monitors()
+print(mon)
+zoomed = False
+Button(root, text=mon[0].name, command=lambda:switch_mon(mon[0])).pack()
+Button(root, text=mon[1].name, command=lambda:switch_mon(mon[1])).pack()
+Button(root, text="Zoom", command=zoom).pack()
+
 root.mainloop()
-
-
-
-# try:
-#     root.state("zoomed")
-# except:
-#     root.attributes('-zoomed', True)
