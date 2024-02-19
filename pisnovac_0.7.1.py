@@ -15,7 +15,7 @@ import subprocess
 import threading
 from screeninfo import get_monitors
 
-VERSION = "0.7.0"
+VERSION = "0.7.1b"
 
 ### KONSTANTY ###
 APP_NAME = "Písňovač"
@@ -30,6 +30,8 @@ BG_SLIDESHOW_IMAGE_NAME = "background.jpg"
 DEFAULT_SLIDESHOW_IMAGE_NAME = "background_default.jpg"
 HELP_TEXT_FILE_NAME = "help_text.txt"
 COLOR_FILE_NAME = "colors.txt"
+
+IMG_RATIO = 9/16
 
 DISPLAYED_SONG_PART_LENGTH = 20 # idk asi idealni delka
 
@@ -106,7 +108,7 @@ text_size_list = [str(i * 2) for i in range(25,51)]
 text_style_list =["Tučné", "Kurzíva", "Žádné"]
 shadow_size_list = [str(i) for i in range(-20,21)]
 border_size_list = [str(i) for i in range(0, 21)]
-sls_target_slide_width = None
+presentation_running = False
 tags_logic = "and"
 recording_name = None
 
@@ -2186,7 +2188,7 @@ def sls_pure_image(color, event=None):
     global sls_slide_overlay
 
     if sls_slide_overlay == color or color == "clear":
-        if sls_slides_canvas is not None and sls_presentation_window.winfo_width() == sls_target_slide_width:
+        if presentation_running:
             sls_slides_canvas.delete("overlay")
         sls_preview_canvas.delete("overlay")
         sls_slide_overlay = "clear"
@@ -2202,7 +2204,7 @@ def sls_pure_image(color, event=None):
             button[0].config(relief = SUNKEN)
 
     else:
-        if sls_slides_canvas is not None and sls_presentation_window.winfo_width() == sls_target_slide_width:
+        if presentation_running:
             sls_slides_canvas.create_rectangle(0,0,sls_presentation_window.winfo_width(),sls_presentation_window.winfo_height(),fill=color,tags=("overlay",))
         sls_preview_canvas.create_rectangle(0,0,sls_preview_canvas.winfo_width(),sls_preview_canvas.winfo_height(),fill=color,tags=("overlay",))
     sls_slide_overlay = color
@@ -2244,7 +2246,7 @@ def sls_change_slide(direction, event=None):
 
 def sls_switch_to_second_monitor():
     """sls_presentation_window da na monitor podle vyberu v dropdown menu"""
-    global sls_target_slide_width, sls_slides_canvas
+    global presentation_running, sls_slides_canvas
     
     selected_mon = get_monitors()[sls_monitor_select_box.current()]
     
@@ -2257,7 +2259,7 @@ def sls_switch_to_second_monitor():
     sls_presentation_window.overrideredirect(1)
     sls_presentation_window.wm_attributes("-topmost", True)
     sls_presentation_window.update()
-    sls_target_slide_width = sls_presentation_window.winfo_width()
+    presentation_running = True
 
     sls_slides_canvas = Canvas(sls_presentation_window, highlightthickness=0, bg = "black")
     sls_slides_canvas.pack(fill = BOTH, expand = 1)
@@ -2301,7 +2303,7 @@ def sls_start_slideshow(event=None):
 
 def sls_end_slideshow(event=None):
     """odbinduje klavesy prezentace a zrusi Canvas"""
-    global sls_slides_canvas,sls_bind_list,sls_presentation_window,sls_target_slide_width
+    global sls_slides_canvas,sls_bind_list,sls_presentation_window,presentation_running
 
     for item in sls_bind_list:
         main_window.unbind(item[0])
@@ -2315,64 +2317,49 @@ def sls_end_slideshow(event=None):
     sls_slides_canvas.destroy()
     sls_slides_canvas = None
 
-
     sls_presentation_window.destroy()
     sls_presentation_window = None
 
-    sls_target_slide_width = None
+    presentation_running = False
 
     sls_preview_canvas.delete("overlay")
 
 def sls_update_slide(text: str):
     """obnovi nahled a obsah na obrazovce"""
-    global sls_target_slide_width
+    global presentation_running
 
     processed_text = add_spaces(text)
 
-    size_x = sls_preview_canvas.winfo_width()
-    size_y = sls_preview_canvas.winfo_height()
-
-    if sls_target_slide_width is None:
-        sls_target_slide_width = main_window.winfo_width()
-
-    # okno musi byt maximalizovane, aby se na nem zobrazily slidy
-    if sls_slides_canvas is not None and sls_target_slide_width == sls_presentation_window.winfo_width():
-        size_x = sls_presentation_window.winfo_width()
-        size_y = sls_presentation_window.winfo_height()
-        
-        # promitani neni ve standartnim pomeru
-        if size_y * 192 > size_x * 108:
-            size_x = int(192/108 * size_y)
-        elif size_y * 192 < size_x * 108:
-            size_y = int(108/192 * size_x)
-    else:
-        size_x = 1920
-        size_y = 1080
-
     # vytvoreni slidu pro prezentaci i nahled
+    WID = 1920
+    HEI = 1080
     image = Image.open(os.path.join(SOURCE_DIR, BG_SLIDESHOW_IMAGE_NAME))
-    slide_original_image = image.resize((size_x, size_y),Image.LANCZOS)
-    obraz = ImageDraw.Draw(slide_original_image)
+    image = image.resize((WID, HEI),Image.LANCZOS)
+    obraz = ImageDraw.Draw(image)
     try:
         font = ImageFont.truetype(SLS_FONT_STYLE[0], int(SLS_FONT_STYLE[1])) # Windows
     except:
         font = ImageFont.truetype(f"/usr/share/fonts/truetype/freefont/{SLS_FONT_STYLE[0]}", int(SLS_FONT_STYLE[1]), encoding="unic") # Unix
     # stin pisma, pokud je zapnuty
     if SLS_SHADOW_SIZE != 0:
-        obraz.text((int(size_x/2) + int(SLS_SHADOW_SIZE),int(size_y/2) + int(SLS_SHADOW_SIZE)), processed_text, fill=SLS_SHADOW_COLOR, font=font,stroke_width=int(SLS_BORDER_SIZE), stroke_fill=SLS_SHADOW_COLOR, align=CENTER, anchor="mm")
+        obraz.text((int(WID/2) + int(SLS_SHADOW_SIZE),int(HEI/2) + int(SLS_SHADOW_SIZE)), processed_text, fill=SLS_SHADOW_COLOR, font=font,stroke_width=int(SLS_BORDER_SIZE), stroke_fill=SLS_SHADOW_COLOR, align=CENTER, anchor="mm")
     # vlastni text
-    obraz.text((int(size_x/2),int(size_y/2)), processed_text, fill=SLS_FONT_COLOR, font=font,stroke_width=int(SLS_BORDER_SIZE), stroke_fill=SLS_BORDER_COLOR, align=CENTER, anchor="mm")
-
-    slide_image = ImageTk.PhotoImage(slide_original_image)
+    obraz.text((int(WID/2),int(HEI/2)), processed_text, fill=SLS_FONT_COLOR, font=font,stroke_width=int(SLS_BORDER_SIZE), stroke_fill=SLS_BORDER_COLOR, align=CENTER, anchor="mm")
 
     # obnoveni slidu pri prezentaci
-    if sls_slides_canvas is not None and sls_target_slide_width == sls_presentation_window.winfo_width():
+    if presentation_running:
+        size_x = sls_presentation_window.winfo_width()
+        size_y = sls_presentation_window.winfo_height()
+        if size_x * IMG_RATIO < size_y:
+            size_y = int(size_x * IMG_RATIO)
+
+        slide_image = ImageTk.PhotoImage(image.resize((size_x, size_y),Image.LANCZOS))
         sls_slides_canvas.delete("all")
         sls_slides_canvas.image = slide_image
-        sls_slides_canvas.create_image(0, 0, image=slide_image, anchor="nw")
+        ps_height = sls_presentation_window.winfo_height()
+        sls_slides_canvas.create_image(0, (ps_height-size_y)/2, image=slide_image, anchor="nw")
 
-    slide_resized_image = slide_original_image.resize((sls_preview_canvas.winfo_width(), sls_preview_canvas.winfo_height()), Image.LANCZOS)
-    preview_image = ImageTk.PhotoImage(slide_resized_image)
+    preview_image = ImageTk.PhotoImage(image.resize((sls_preview_canvas.winfo_width(), sls_preview_canvas.winfo_height()), Image.LANCZOS))
 
     sls_preview_canvas.delete("all")
     sls_preview_canvas.image = preview_image
