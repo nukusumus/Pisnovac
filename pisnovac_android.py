@@ -11,6 +11,9 @@ song_url = "https://www.stud.fit.vutbr.cz/~xsterb16/Downloads/files/songs.zip"
 img_url = "https://www.stud.fit.vutbr.cz/~xsterb16/Downloads/files/img.zip"
 update_url = "https://www.stud.fit.vutbr.cz/~xsterb16/Downloads/files/pisnovac_android.txt"
 
+RATIO = 1.6
+FONT = "arial 8 bold"
+
 selected_song = None
 search_lock=False
 img = None # aktualne zobrazeny img
@@ -30,6 +33,7 @@ source_path = pisnovac_dir + "pisnovac_android.py"
 song_list = []
 
 transpozice = 0
+transpozice_text = 0
 open_song_name = ""
 
 def download(url, tmp_path, dest_path):
@@ -57,7 +61,7 @@ def sync():
 	
 	sync_btn.config(state=NORMAL)
 	
-	root.after(5000, lambda: sync_btn.config(text="Synchronizovat", bg="#3ae"))
+	root.after(5000, lambda: sync_btn.config(text="Synchronizovat", bg="#cf6b22"))
 
 	load_song_from_zip()
 	update_songs_trw()
@@ -65,7 +69,7 @@ def sync():
 
 def open_song(name):
 	"""misto select framu da preview frame s pisni a transpozicemi"""
-	global selected_song, open_song_name, transpozice
+	global selected_song, open_song_name, transpozice, transpozice_text
 	
 	if not songs_trw.selection():
 		return
@@ -78,6 +82,7 @@ def open_song(name):
 
 	open_song_name = selected_song
 	transpozice = 0
+	transpozice_text = 0
 
 	select_scene("view")
 	update_view_img()
@@ -102,14 +107,20 @@ def update_view_img():
 	zfile.extract(jpg_name, pisnovac_dir)
 	img = Image.open(pisnovac_dir + jpg_name)
 
+	img = img.resize((preview_width, preview_height), Image.LANCZOS)
+
 	photo = ImageTk.PhotoImage(img)
 	os.remove(pisnovac_dir + jpg_name)
-	view_lbl.config(image=photo)
+
+	view_canvas.image = photo
+	view_canvas.create_image(int(preview_width/2), int(preview_height/2), image=photo)
 
 def transpose(delta):
 	"""handler transpose tlacitek, TODO"""
-	global transpozice
+	global transpozice, transpozice_text
 	transpozice = (transpozice + delta) % 12
+	transpozice_text += delta
+	transpozice_lbl.config(text = f"Transpozice: {transpozice_text}")
 	update_view_img()
 
 def update_songs_trw(match_list = None):
@@ -167,52 +178,88 @@ def load_song_from_zip():
 			song_list.append(tuple([filename, song_text]))
 
 
+# updates
+def update_source_file():
+	try:
+		download(update_url, source_path, source_path)
+		update_btn.config(bg="#3f6")
+	except:
+		update_btn.config(bg="#f30")
+	update_btn.after(5000, lambda:update_btn.config(bg="#cf6b22"))
+
+
 if not os.path.exists(pisnovac_dir):
 	os.mkdir(pisnovac_dir)
 
-# update
-try:
-	download(update_url, source_path, source_path)
-except:
-	pass
 
 root = Tk()
-song_select_fr = Frame(root)
-song_preview_fr = Frame(root)
+root.geometry("600x1080")
+
+root.update()
+
+w_h = root.winfo_height()
+w_w = root.winfo_width()
+
+preview_width = w_w
+preview_height = int(RATIO * preview_width)
+
+style = ttk.Style(root)
+# set ttk theme to "clam" which support the fieldbackground option
+style.theme_use("clam")
+style.configure("Treeview", background="#042A40", fieldbackground="#042A40", foreground="white", font=FONT)
+
+song_select_fr = Frame(root, bg="#042A40")
+song_preview_fr = Frame(root, bg="#042A40")
 
 # naplneni sel sceny
 
-sync_btn = Button(song_select_fr, text = "Synchronizovat", command = call_sync)
-sync_btn.config(bg="#3ae")
-sync_btn.pack(fill=X)
+sync_frame =  Frame(song_select_fr)
+sync_frame.pack(fill=X)
+sync_frame.columnconfigure((0,1), weight=1)
+sync_frame.rowconfigure(0, weight=1)
 
-songs_trw = ttk.Treeview(song_select_fr, show= "tree")
+sync_btn = Button(sync_frame, text = "Synchronizovat písně", command = call_sync, bg="#cf6b22", fg="white", font=FONT)
+sync_btn.grid(row=0, column=0, sticky=NSEW)
+
+update_btn = Button(sync_frame, text = "Stáhnout novou verzi", command = update_source_file, bg="#cf6b22", fg="white", font=FONT)
+update_btn.grid(row=0, column=1, sticky=NSEW)
+
+trw_fr = Frame(song_select_fr)
+trw_fr.pack(fill=BOTH, expand=1)
+trw_fr.columnconfigure(0, weight=1)
+trw_fr.rowconfigure(0, weight=1)
+
+songs_trw = ttk.Treeview(trw_fr, show = "tree")
 ttk.Style().configure("Treeview", rowheight = 100)
 songs_trw.bind("<<TreeviewSelect>>", open_song)
-songs_trw.pack(fill=BOTH, expand=1)
+songs_trw.grid(row=0, column=0, sticky=NSEW)
 
-search_entry = Entry(song_select_fr, bg="#8be")
+scroll_bar = ttk.Scrollbar(trw_fr, orient="vertical", command=songs_trw.yview)
+scroll_bar.grid(row=0, column=1, sticky=NSEW)
+
+songs_trw.configure(yscrollcommand=scroll_bar.set)  
+
+search_entry = Entry(song_select_fr, bg="white", relief=SUNKEN)
 search_entry.bind("<KeyPress>", search_buffer)
 search_entry.pack(fill=X)
 
 #naplneni view sceny
 
-# song_preview_fr.rowconfigure(0, weight=1)
-# song_preview_fr.columnconfigure(0, weight=1)
+view_canvas = Canvas(song_preview_fr, width=preview_width, height=preview_height)
+# view_canvas.pack(side=CENTER)
+view_canvas.place(relx=0.5, rely=0.5, anchor=CENTER)
 
-view_lbl = Label(song_preview_fr)
-view_lbl.pack(fill=BOTH, expand=1)
+Button(song_preview_fr, text="Zpět", command=lambda:select_scene("sel"), bg="#cf6b22", fg="white", font=FONT).pack(side=BOTTOM, fill=X)
 
-tools_fr = Frame(song_preview_fr, height=20)
-# tools_fr.pack(fill=X, expand=0, side=TOP)
-# tools_fr.grid(row=1, column=0, sticky=NSEW)
-tools_fr.pack(fill=X, expand=0)
+tools_fr = Frame(song_preview_fr)
+tools_fr.pack(fill=X, side=TOP)
 tools_fr.rowconfigure(0, weight=1)
 tools_fr.columnconfigure(1, weight=1)
 
-Button(tools_fr, text="-1",command=lambda: transpose(-1)).grid(row=0, column=0, sticky=NSEW)
-Button(tools_fr, text="Zpět", command=lambda:select_scene("sel"), bg="white").grid(row=0, column=1, sticky=NSEW)
-Button(tools_fr, text="+1", command=lambda:transpose(1)).grid(row=0, column=2, sticky=NSEW)
+Button(tools_fr, text="   -1   ",command=lambda: transpose(-1), bg="#cf6b22", fg="white", font=FONT).grid(row=0, column=0, sticky=NSEW)
+transpozice_lbl = Label(tools_fr, text=f"Transpozice: {transpozice_text}", bg="#cf6b22", fg="white", relief=RAISED, font=FONT)
+transpozice_lbl.grid(row=0, column=1, sticky=NSEW)
+Button(tools_fr, text="   +1   ", command=lambda:transpose(1), bg="#cf6b22", fg="white", font=FONT).grid(row=0, column=2, sticky=NSEW)
 
 select_scene("sel")
 
