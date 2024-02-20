@@ -9,18 +9,24 @@ from threading import Thread
 
 song_url = "https://www.stud.fit.vutbr.cz/~xsterb16/Downloads/files/songs.zip"
 img_url = "https://www.stud.fit.vutbr.cz/~xsterb16/Downloads/files/img.zip"
+update_url = "https://www.stud.fit.vutbr.cz/~xsterb16/Downloads/files/pisnovac_android.txt"
 
 selected_song = None
 search_lock=False
 img = None # aktualne zobrazeny img
 photo = None
-home_dir = "/storage/emulated/0/"
-# home_dir = "C:/Users/Nukus/"
-home_dir = "/home/nuk/smazat/"
+if os.path.exists("/storage/emulated/0/"):
+	home_dir = "/storage/emulated/0/"
+elif os.path.exists("C:/Users/Nukus/"):
+	home_dir = "C:/Users/Nukus/"
+elif os.path.exists("/home/nuk/smazat/"):
+	home_dir = "/home/nuk/smazat/"
+
 pisnovac_dir = home_dir + "Pisnovac/"
 song_zip_path = pisnovac_dir + "songs.zip"
 img_zip_path = pisnovac_dir + "img.zip"
 temp_path = pisnovac_dir + "zip.tmp"
+source_path = pisnovac_dir + "pisnovac_android.py"
 song_list = []
 
 transpozice = 0
@@ -39,7 +45,7 @@ def call_sync():
 
 def sync():
 	"""stahne zipy s pisnemi .sbf a s nahledy"""
-	sync_btn.config(text="Stahování ...", bg="#c60", state=DISABLED)
+	sync_btn.config(text="Stahování ...", bg="orange", state=DISABLED)
 	sync_btn.update()
 	
 	try:	
@@ -61,10 +67,10 @@ def open_song(name):
 	"""misto select framu da preview frame s pisni a transpozicemi"""
 	global selected_song, open_song_name, transpozice
 	
-	now_selected = songs_trw.selection()[0]
-	
-	if not now_selected:
+	if not songs_trw.selection():
 		return
+	
+	now_selected = songs_trw.selection()[0]
 		
 	if selected_song  != now_selected:
 		selected_song = now_selected
@@ -91,18 +97,11 @@ def select_scene(scene):
 def update_view_img():
 	global transpozice, open_song_name, img, photo
 	jpg_name = open_song_name + f"{transpozice}.jpg"
-	print(jpg_name)
 
 	zfile = ZipFile(img_zip_path,'r')
 	zfile.extract(jpg_name, pisnovac_dir)
 	img = Image.open(pisnovac_dir + jpg_name)
-	old_w = img.width
-	old_h = img.height
-	ratio = old_h / old_w
 
-	size = (root.winfo_width(), int(root.winfo_width() * ratio))
-
-	img.resize(size, Image.Resampling.LANCZOS)
 	photo = ImageTk.PhotoImage(img)
 	os.remove(pisnovac_dir + jpg_name)
 	view_lbl.config(image=photo)
@@ -111,7 +110,6 @@ def transpose(delta):
 	"""handler transpose tlacitek, TODO"""
 	global transpozice
 	transpozice = (transpozice + delta) % 12
-	transpose_lbl.config(text=f"transpozice: {transpozice}")
 	update_view_img()
 
 def update_songs_trw(match_list = None):
@@ -158,6 +156,7 @@ def search_buffer(event=None):
 
 def load_song_from_zip():
 	global song_list
+	song_list = []
 	# Pokud zip neexistuje, exit
 	if os.path.exists(song_zip_path) and os.path.exists(img_zip_path):
 		#otevreni a naskenovani song zipu
@@ -171,13 +170,19 @@ def load_song_from_zip():
 if not os.path.exists(pisnovac_dir):
 	os.mkdir(pisnovac_dir)
 
+# update
+try:
+	download(update_url, source_path, source_path)
+except:
+	pass
+
 root = Tk()
 song_select_fr = Frame(root)
 song_preview_fr = Frame(root)
 
 # naplneni sel sceny
 
-sync_btn = Button(song_select_fr, text = "Synchronizovat", command = sync)
+sync_btn = Button(song_select_fr, text = "Synchronizovat", command = call_sync)
 sync_btn.config(bg="#3ae")
 sync_btn.pack(fill=X)
 
@@ -192,21 +197,22 @@ search_entry.pack(fill=X)
 
 #naplneni view sceny
 
+# song_preview_fr.rowconfigure(0, weight=1)
+# song_preview_fr.columnconfigure(0, weight=1)
+
 view_lbl = Label(song_preview_fr)
-view_lbl.pack(fill=BOTH, expand = 1)
+view_lbl.pack(fill=BOTH, expand=1)
 
-transpose_fr = Frame(song_preview_fr)
-transpose_fr.pack(fill=X, expand=0)
-transpose_fr.columnconfigure(1, weight=1)
-transpose_fr.rowconfigure(0, weight=1)
+tools_fr = Frame(song_preview_fr, height=20)
+# tools_fr.pack(fill=X, expand=0, side=TOP)
+# tools_fr.grid(row=1, column=0, sticky=NSEW)
+tools_fr.pack(fill=X, expand=0)
+tools_fr.rowconfigure(0, weight=1)
+tools_fr.columnconfigure(1, weight=1)
 
-transpose_lbl = Label(transpose_fr, text = "transpozice: 0")
-transpose_lbl.grid(column=1, row=0)
-
-Button(transpose_fr, text="-1",command=lambda: transpose(-1), height=10).grid(column=0, row=0, sticky=W)
-Button(transpose_fr, text="+1", command=lambda:transpose(1), height=10).grid(column=2, row=0, sticky=E)
-
-Button(song_preview_fr, text="Zpět", command=lambda:select_scene("sel"), bg="white", height=40).pack(fill=X)
+Button(tools_fr, text="-1",command=lambda: transpose(-1)).grid(row=0, column=0, sticky=NSEW)
+Button(tools_fr, text="Zpět", command=lambda:select_scene("sel"), bg="white").grid(row=0, column=1, sticky=NSEW)
+Button(tools_fr, text="+1", command=lambda:transpose(1)).grid(row=0, column=2, sticky=NSEW)
 
 select_scene("sel")
 
