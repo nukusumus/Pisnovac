@@ -2254,7 +2254,10 @@ def sls_switch_to_second_monitor():
 
     sls_presentation_window.geometry(s)
     sls_presentation_window.update()
-    sls_presentation_window.state("zoomed")
+    try:
+        sls_presentation_window.state("zoomed")
+    except:
+        sls_presentation_window.attributes("-zoomed", True)
 
     sls_presentation_window.overrideredirect(1)
     sls_presentation_window.wm_attributes("-topmost", True)
